@@ -8,6 +8,7 @@ Usage
     python -m src.driver --emit=ast    docs/examples/abs.mini
     python -m src.driver --emit=cir    docs/examples/abs.mini   (Week 5)
     python -m src.driver --demo-cir                             (hand-built CIR)
+    python -m src.driver --demo-stack                           (reg-to-stack)
 
 Stages that are not yet implemented exit with status 3 and a message naming
 the module, the owner and the week they are scheduled for, so that the state
@@ -78,6 +79,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="execute the emitted target (Week 9)")
     ap.add_argument("--demo-cir", action="store_true",
                     help="print the hand-built abs() CIR module")
+    ap.add_argument("--demo-stack", action="store_true",
+                    help="lower the hand-built abs() module to stack form and "
+                         "report the naive vs peepholed instruction counts")
     args = ap.parse_args(argv)
 
     if args.demo_cir:
@@ -85,8 +89,23 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(print_module(_demo_cir_module()))
         return 0
 
+    if args.demo_stack:
+        from .backend.wasm.reg2stack import count_function, lower_function
+        fn = _demo_cir_module().function("abs")
+        for label, seq in lower_function(fn).items():
+            print(f"{label}:")
+            for op in seq:
+                print(f"    {op}")
+        naive, tuned = count_function(fn)
+        saved = 100.0 * (naive - tuned) / naive
+        print(f"\nnaive lowering:     {naive} stack instructions")
+        print(f"after peephole:     {tuned} stack instructions")
+        print(f"reduction:          {saved:.1f}%")
+        return 0
+
     if not args.source:
-        ap.error("a source file is required unless --demo-cir is given")
+        ap.error("a source file is required unless --demo-cir or "
+                 "--demo-stack is given")
 
     path = Path(args.source)
     if not path.exists():

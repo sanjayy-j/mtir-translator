@@ -29,13 +29,23 @@ single semantics and each back end emits the guard code that realises it. See
 | [Name] | CIR core / LLVM | CIR design, builder, printer/parser, optimiser, LLVM back end (M3, M4, M5) |
 | [Name] | Stack targets / Testing | Reg-to-stack, CFG structuring, Wasm + bytecode back ends, harness, CI (M6, M7, M8b) |
 
+## Creating the repository
+
+```bash
+bash scripts/init_repo.sh https://github.com/sanjayy-j/mtir-translator.git
+```
+
+Verifies the tree, makes the scaffold commit and pushes. It deliberately does
+not fabricate a per-member commit history — it prints the ownership split so
+each member commits their own area.
+
 ## Quick start
 
 ```bash
-git clone https://github.com/<org>/mtir-translator.git
+git clone https://github.com/sanjayy-j/mtir-translator.git
 cd mtir-translator
 bash scripts/setup.sh          # checks toolchain versions, runs a smoke test
-python -m pytest -q            # 64 tests
+python -m pytest -q            # 87 tests
 ```
 
 ## What works today (Review 1)
@@ -49,6 +59,9 @@ python -m src.driver --emit=ast docs/examples/abs.mini
 
 # CIR data structures + printer, on the hand-built abs() module
 python -m src.driver --demo-cir
+
+# Register-to-stack lowering, with measured naive vs peepholed counts
+python -m src.driver --demo-stack
 
 # ...and it is byte-identical to the checked-in golden file
 python -m src.driver --demo-cir | diff - docs/examples/abs.cir && echo IDENTICAL

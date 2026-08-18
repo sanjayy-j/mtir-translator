@@ -1,10 +1,10 @@
 """Register-to-stack lowering.
 
 Module M6a.  Owner: Member 4.
-Status: DESIGNED (pseudocode below, from Listing 3 of the Review 1 report).
-        Implementation Weeks 6-7.  The peephole rule is implemented and tested
-        already, because it is the part with a non-obvious correctness
-        condition and it is shared by two back ends.
+Status: PROTOTYPE.  The naive schema and the peephole rule are both
+        implemented and tested; production hardening (calls, memory ops,
+        multi-type locals) is Weeks 6-7.  This pass is shared by the
+        WebAssembly back end (M6c) and the bytecode back end (M7).
 
 Why this pass exists
 --------------------
@@ -37,14 +37,19 @@ block, never needs to leave the operand stack:
         if useCount(l) == 1 and l is not live-out of the block:
             delete both instructions
 
-On the abs example this takes the naive 11 instructions down to 7.  The
-before/after instruction count across the corpus is a Review 3 result.
+Measured on the abs example of Figure 2 (run `python -m src.driver
+--demo-stack` to reproduce): the naive schema emits 14 stack instructions and
+the peephole rule reduces this to 10, a 28.6% reduction.  The corresponding
+before/after figure across the whole corpus is a Review 3 result.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Dict, List, Set
+
+from ...cir.ir import (BasicBlock, ConstFloat, ConstInt, Function, GlobalRef,
+                       Instr, Reg, Ty)
 
 
 @dataclass(frozen=True)
@@ -89,11 +94,148 @@ def peephole(seq: List[StackOp], use_count: Dict[str, int],
     return out
 
 
-def lower_block(block, local_of):  # pragma: no cover - Week 6-7
-    """Lower one CIR basic block to a stack sequence.
+# --------------------------------------------------------------------------
+# Opcode mapping
+# --------------------------------------------------------------------------
+_PREFIX = {Ty.I1: "i32", Ty.I32: "i32", Ty.I64: "i64",
+           Ty.F64: "f64", Ty.PTR: "i32", Ty.VOID: "i32"}
 
-    TODO(Member 4, Week 6): implement the naive schema above, then call
-    peephole() with the block's use counts and live-out set.
+_CMP = {"eq": "eq", "ne": "ne",
+        "slt": "lt_s", "sle": "le_s", "sgt": "gt_s", "sge": "ge_s",
+        "ult": "lt_u", "ule": "le_u", "ugt": "gt_u", "uge": "ge_u",
+        "oeq": "eq", "one": "ne", "olt": "lt", "ole": "le",
+        "ogt": "gt", "oge": "ge"}
+
+_BINOP = {"add": "add", "sub": "sub", "mul": "mul",
+          "sdiv": "div_s", "udiv": "div_u", "srem": "rem_s", "urem": "rem_u",
+          "fadd": "add", "fsub": "sub", "fmul": "mul", "fdiv": "div",
+          "and": "and", "or": "or", "xor": "xor",
+          "shl": "shl", "ashr": "shr_s", "lshr": "shr_u"}
+
+
+def opcode_for(instr: Instr) -> StackOp:
+    """Map one CIR opcode to its stack-machine opcode.
+
+    `instr.ty` is the operand type for comparisons and the result type
+    otherwise, which is why a single prefix lookup serves both.
     """
-    raise NotImplementedError(
-        "register-to-stack lowering is scheduled for Weeks 6-7 (M6a, Member 4)")
+    p = _PREFIX[instr.ty]
+    op = instr.op
+    if op == "ret":
+        return StackOp("return")
+    if op == "br":
+        return StackOp("br", instr.labels[0])
+    if op == "br.cond":
+        return StackOp("br_if", instr.labels[0])
+    if op.startswith(("icmp.", "fcmp.")):
+        return StackOp(f"{p}.{_CMP[op.split('.', 1)[1]]}")
+    if op in _BINOP:
+        return StackOp(f"{p}.{_BINOP[op]}")
+    if op == "call":
+        return StackOp("call", f"${instr.callee}")
+    if op.startswith("print."):
+        return StackOp("call", f"$print_{op.split('.', 1)[1]}")
+    if op == "trap":
+        return StackOp("unreachable")
+    return StackOp(f"{p}.{op}")
+
+
+def _push_operand(value, local_of: Dict[str, str]) -> StackOp:
+    if isinstance(value, (ConstInt, ConstFloat)):
+        return StackOp(f"{_PREFIX[value.ty]}.const", value.value)
+    if isinstance(value, Reg):
+        return StackOp("local.get", local_of[value.name])
+    if isinstance(value, GlobalRef):
+        return StackOp("global.get", f"${value.name}")
+    raise TypeError(f"cannot push operand of type {type(value).__name__}")
+
+
+# --------------------------------------------------------------------------
+# The pass
+# --------------------------------------------------------------------------
+def lower_block_naive(block: BasicBlock, local_of: Dict[str, str]) -> List[StackOp]:
+    """The naive schema: push every operand, apply the opcode, park the result.
+
+    Always correct for any three-address sequence, and deliberately kept as a
+    separate function so the peephole rule can be measured against it.
+    """
+    out: List[StackOp] = []
+    for instr in block.instrs:
+        for operand in instr.args:
+            out.append(_push_operand(operand, local_of))
+        out.append(opcode_for(instr))
+        if instr.dest is not None:
+            out.append(StackOp("local.set", local_of[instr.dest.name]))
+    return out
+
+
+def block_use_counts(block: BasicBlock, local_of: Dict[str, str]) -> Dict[str, int]:
+    """How many times each local is read inside this block."""
+    counts: Dict[str, int] = {}
+    for instr in block.instrs:
+        for operand in instr.args:
+            if isinstance(operand, Reg):
+                local = local_of[operand.name]
+                counts[local] = counts.get(local, 0) + 1
+    return counts
+
+
+def block_live_out(fn: Function, block: BasicBlock,
+                   local_of: Dict[str, str]) -> Set[str]:
+    """Locals read by some block other than this one.
+
+    A deliberately conservative over-approximation: a real liveness analysis
+    over the CFG (M4, Week 10) will shrink this set and so expose more
+    peephole opportunities.  Over-approximating is safe -- it only ever
+    suppresses an optimisation, never enables an unsound one.
+    """
+    live: Set[str] = set()
+    for other in fn.blocks:
+        if other is block:
+            continue
+        for instr in other.instrs:
+            for operand in instr.args:
+                if isinstance(operand, Reg):
+                    live.add(local_of[operand.name])
+    return live
+
+
+def lower_block(block: BasicBlock, local_of: Dict[str, str],
+                use_count: Dict[str, int] | None = None,
+                live_out: Set[str] | None = None) -> List[StackOp]:
+    """Lower one CIR basic block to a peephole-cleaned stack sequence."""
+    naive = lower_block_naive(block, local_of)
+    if use_count is None:
+        use_count = block_use_counts(block, local_of)
+    if live_out is None:
+        live_out = set()
+    return peephole(naive, use_count, live_out)
+
+
+def local_table(fn: Function) -> Dict[str, str]:
+    """Assign a stack-machine local to every parameter and defined register."""
+    table: Dict[str, str] = {p.name: f"${p.name}" for p in fn.params}
+    for block in fn.blocks:
+        for instr in block.instrs:
+            if instr.dest is not None:
+                table.setdefault(instr.dest.name, f"${instr.dest.name}")
+    return table
+
+
+def lower_function(fn: Function) -> Dict[str, List[StackOp]]:
+    """Lower every block of a function.  Returns label -> stack sequence."""
+    local_of = local_table(fn)
+    return {
+        b.label: lower_block(b, local_of,
+                             block_use_counts(b, local_of),
+                             block_live_out(fn, b, local_of))
+        for b in fn.blocks
+    }
+
+
+def count_function(fn: Function) -> tuple[int, int]:
+    """(naive instruction count, peepholed instruction count) for a function."""
+    local_of = local_table(fn)
+    naive = sum(len(lower_block_naive(b, local_of)) for b in fn.blocks)
+    tuned = sum(len(seq) for seq in lower_function(fn).values())
+    return naive, tuned
