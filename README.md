@@ -1,6 +1,6 @@
 # Multi-Target Intermediate Representation Translator
 
-**BCSE307 — Compiler Design** · Team [Team No.] · Project [Project ID]
+**BCSE307 — Compiler Design** · Team 5 · Project A30
 
 Design a common intermediate representation and translate it to multiple
 execution targets while preserving semantics.
@@ -8,11 +8,11 @@ execution targets while preserving semantics.
 MiniLang source → **CIR** (typed, register-based three-address IR with an
 explicit CFG) → three targets:
 
-| Target | Model | Status |
-|---|---|---|
-| LLVM IR (`.ll`) | register / SSA, unstructured CFG | Weeks 6–7 |
-| WebAssembly (`.wat` / `.wasm`) | structured stack machine, no `goto` | Weeks 7–8 |
-| Stack bytecode (`.sbc`) + reference VM | flat stack machine, absolute jumps | Week 9 |
+| Target | Model | 
+|---|---|
+| LLVM IR (`.ll`) | register / SSA, unstructured CFG | 
+| WebAssembly (`.wat` / `.wasm`) | structured stack machine, no `goto` | 
+| Stack bytecode (`.sbc`) + reference VM | flat stack machine, absolute jumps | 
 
 The interesting problem is not emitting three files — it is that the targets
 **disagree about what programs mean**. WebAssembly masks over-wide shift
@@ -24,10 +24,10 @@ single semantics and each back end emits the guard code that realises it. See
 
 | Member | Role | Owns |
 |---|---|---|
-| [Name] | Lead / Front end | Language spec, lexer, parser, AST, CLI (M1, M9) |
-| [Name] | Requirements / Semantics | Symbol table, type checker, CIR verifier, reference interpreter (M2, M3b, M8a) |
-| [Name] | CIR core / LLVM | CIR design, builder, printer/parser, optimiser, LLVM back end (M3, M4, M5) |
-| [Name] | Stack targets / Testing | Reg-to-stack, CFG structuring, Wasm + bytecode back ends, harness, CI (M6, M7, M8b) |
+| Krishita | Lead / Front end | Language spec, lexer, parser, AST, CLI (M1, M9) |
+| Pragati | Requirements / Semantics | Symbol table, type checker, CIR verifier, reference interpreter (M2, M3b, M8a) |
+| Sanjay | CIR core / LLVM | CIR design, builder, printer/parser, optimiser, LLVM back end (M3, M4, M5) |
+| Sparsh | Stack targets / Testing | Reg-to-stack, CFG structuring, Wasm + bytecode back ends, harness, CI (M6, M7, M8b) |
 
 ## Creating the repository
 
@@ -76,25 +76,6 @@ $ python -m src.driver --emit=wat docs/examples/abs.mini
 error: --emit=wat is not implemented yet.
        WebAssembly back end (M6c) is owned by Member 4 and is scheduled for Weeks 7-8.
 ```
-
-| Component | Module | Owner | Status |
-|---|---|---|---|
-| Lexer | M1a | M1 | ✅ complete |
-| Parser + AST | M1b | M1 | ✅ complete |
-| CIR data structures + printer | M3a/M3c | M3 | ✅ complete |
-| Reg-to-stack peephole rule | M6a | M4 | ✅ implemented + tested |
-| CLI driver | M9 | M1 | ✅ complete |
-| Test corpus + CI | M8b | M4 | ✅ 12 programs, CI green |
-| Symbol table + type checker | M2 | M2 | 🕐 Week 4 |
-| CIR builder | M3a | M3 | 🕐 Week 5 |
-| CIR verifier + text parser | M3b/M3c | M2/M3 | 🕐 Weeks 5–6 |
-| LLVM back end | M5 | M3 | 🕐 Weeks 6–7 |
-| Reg-to-stack lowering | M6a | M4 | 🕐 Weeks 6–7 |
-| CFG structuring | M6b | M4 | 🕐 Week 8 |
-| WebAssembly back end | M6c | M4 | 🕐 Weeks 7–8 |
-| Stack bytecode + VM | M7 | M4 | 🕐 Week 9 |
-| CIR interpreter + differential harness | M8 | M2/M4 | 🕐 Weeks 8–9 |
-| Optimiser | M4 | M3 | 🕐 Week 10 |
 
 ## The worked example
 
