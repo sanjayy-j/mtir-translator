@@ -1,0 +1,13 @@
+// Boundary: INT_MIN / -1 and division by zero.
+// CIR defines both as traps.  WebAssembly traps natively; LLVM leaves both
+// undefined, so the LLVM back end must emit explicit checks.
+// See docs/divergence.md rows 1 and 2.
+fn div(a: int, b: int) -> int {
+    return a / b;
+}
+
+fn main() -> int {
+    print_int(div(7, 2));
+    print_int(div(-2147483648, -1));   // must trap
+    return 0;
+}

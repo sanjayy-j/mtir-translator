@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Generated compiler output
+*.ll
+*.bc
+*.wat
+*.wasm
+*.sbc
+build/
+out/
+
+# Keep the hand-written worked examples, which are checked-in evidence
+!docs/examples/*.ll
+!docs/examples/*.wat
+
+.DS_Store
+.idea/
+.vscode/

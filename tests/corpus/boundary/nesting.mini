@@ -1,0 +1,27 @@
+// Boundary: deep nesting, empty bodies, and code after return.
+fn deep(n: int) -> int {
+    if (n > 0) {
+        if (n > 1) {
+            if (n > 2) {
+                if (n > 3) {
+                    if (n > 4) { return 5; }
+                    return 4;
+                }
+                return 3;
+            }
+            return 2;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+fn empty() -> void { }
+
+fn main() -> int {
+    while (false) { }
+    for (let i: int = 0; i < 0; i = i + 1) { }
+    empty();
+    print_int(deep(3));
+    return 0;
+}

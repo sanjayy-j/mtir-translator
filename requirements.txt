@@ -1,0 +1,9 @@
+# Runtime: none. The compiler itself is pure Python 3.11+ with no dependencies,
+# which keeps the artefact readable and the setup trivial.
+
+# Development and testing
+pytest>=8.0
+pytest-cov>=5.0
+
+# Optional, from Week 11: property-based random program generation for fuzzing
+# hypothesis>=6.0

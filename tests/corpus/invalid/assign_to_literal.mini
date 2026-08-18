@@ -1,0 +1,5 @@
+// Expect: syntax error -- left-hand side of assignment is not assignable
+fn main() -> int {
+    3 = 4;
+    return 0;
+}
