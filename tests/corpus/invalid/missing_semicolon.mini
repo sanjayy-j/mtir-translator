@@ -1,0 +1,5 @@
+// Expect: syntax error at 3:18 -- expected ';'
+fn main() -> int {
+    let a: int = 1
+    return a;
+}

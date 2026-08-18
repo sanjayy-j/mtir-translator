@@ -1,0 +1,11 @@
+// Boundary: shift counts at and beyond the operand width.
+// CIR defines the count as taken modulo the width, so 1 << 32 == 1 << 0 == 1.
+// WebAssembly does this natively; the LLVM back end must emit 'and i32 %c, 31'
+// or the result is poison.  See docs/divergence.md row 3.
+fn main() -> int {
+    print_int(1 << 0);
+    print_int(1 << 31);
+    print_int(1 << 32);
+    print_int(1 << 33);
+    return 0;
+}

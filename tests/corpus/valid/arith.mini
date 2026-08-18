@@ -1,0 +1,9 @@
+// Arithmetic and operator precedence.
+fn main() -> int {
+    let a: int = 2 + 3 * 4;        // 14
+    let b: int = (2 + 3) * 4;      // 20
+    let c: int = 17 % 5;           // 2
+    let d: int = 1 << 4 | 3;       // 19
+    print_int(a + b + c + d);
+    return 0;
+}

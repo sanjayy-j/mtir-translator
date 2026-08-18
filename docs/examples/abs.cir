@@ -1,0 +1,10 @@
+func @abs(i32 %x) -> i32 {
+entry:
+  %t0 = icmp.slt i32 %x, 0
+  br %t0 ? then : exit
+then:
+  %t1 = sub i32 0, %x
+  ret i32 %t1
+exit:
+  ret i32 %x
+}

@@ -1,0 +1,17 @@
+; Hand-written stack bytecode for docs/examples/abs.cir  (textual form)
+; Contrast with abs.wat: labels stay flat and jumps are absolute, so no
+; structuring pass is required.  The instruction-count difference between
+; this file and abs.wat isolates the cost of structuring.
+
+abs:
+        LOADL   x
+        PUSHI   0
+        LT_S
+        JZ      L_exit
+        PUSHI   0
+        LOADL   x
+        SUB
+        RET
+L_exit:
+        LOADL   x
+        RET

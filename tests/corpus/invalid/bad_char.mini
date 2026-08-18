@@ -1,0 +1,5 @@
+// Expect: lexical error -- unexpected character '$'
+fn main() -> int {
+    let a: int = 1 $ 2;
+    return a;
+}

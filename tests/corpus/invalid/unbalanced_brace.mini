@@ -1,0 +1,3 @@
+// Expect: syntax error -- unterminated block: expected '}'
+fn main() -> int {
+    return 0;

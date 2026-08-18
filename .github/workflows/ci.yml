@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Verify environment and run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dev dependencies
+        run: python -m pip install -r requirements.txt
+
+      # The same script every member runs locally, so local and CI
+      # environments cannot silently diverge.
+      - name: Verify environment
+        run: bash scripts/setup.sh
+
+      - name: Run tests
+        run: python -m pytest -q --cov=src --cov-report=term-missing
+
+      # Golden-file check: the CIR printer must stay byte-identical to the
+      # worked example in the Review 1 report.
+      - name: CIR printer golden file
+        run: python -m src.driver --demo-cir | diff - docs/examples/abs.cir
+
+  validate-examples:
+    name: Validate hand-written target files
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM and WABT
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm wabt
+
+      - name: llvm-as accepts docs/examples/abs.ll
+        run: llvm-as docs/examples/abs.ll -o /tmp/abs.bc
+
+      - name: wat2wasm accepts docs/examples/abs.wat
+        run: wat2wasm docs/examples/abs.wat -o /tmp/abs.wasm
+
+      - name: Module validates
+        run: wasm-validate /tmp/abs.wasm

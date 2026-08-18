@@ -1,0 +1,5 @@
+// Expect: lexical error -- unterminated block comment
+fn main() -> int {
+    /* this comment never closes
+    return 0;
+}
