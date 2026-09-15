@@ -27,8 +27,13 @@
 #include <io.h>
 #endif
 
+#include "mtir/ast/AST.h"
 #include "mtir/backend/llvm/EmitLL.h"
+#include "mtir/cir/Builder.h"
 #include "mtir/cir/Parser.h"
+#include "mtir/frontend/Lexer.h"
+#include "mtir/frontend/Parser.h"
+#include "mtir/sema/Analyse.h"
 #include "mtir/cir/Printer.h"
 #include "mtir/cir/Verifier.h"
 #include "mtir/opt/Pass.h"
@@ -39,11 +44,10 @@ const char *kUsage = R"(mtirc -- Multi-Target Intermediate Representation Transl
 
 usage: mtirc [options] <file>
 
-  <file>            a .cir module (a .mini source needs the front end, which
-                    is not migrated to C++ yet)
+  <file>            a .mini source or a .cir module
 
 options:
-  --emit=<stage>    cir | ll        (default: cir)
+  --emit=<stage>    tokens | ast | cir | ll        (default: cir)
   --opt=<level>     0 | 1           (default: 0)
                     1 = constant folding, copy propagation, dead-code
                         elimination, run to a fixed point
@@ -80,8 +84,6 @@ int notYetImplemented(const std::string &stage) {
     const char *phase;
   };
   static const Pending pending[] = {
-      {"tokens", "lexer (M1a)", "Member 1", "migration phase C"},
-      {"ast", "parser and AST (M1b)", "Member 1", "migration phase C"},
       {"wat", "WebAssembly back end (M6c)", "Member 4", "migration phase H"},
       {"sbc", "stack bytecode back end (M7)", "Member 4", "migration phase H"},
   };
@@ -143,7 +145,8 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (options.emit != "cir" && options.emit != "ll")
+  if (options.emit != "tokens" && options.emit != "ast" && options.emit != "cir" &&
+      options.emit != "ll")
     return notYetImplemented(options.emit);
 
   if (options.input.empty()) {
@@ -160,13 +163,6 @@ int main(int argc, char **argv) {
   buffer << in.rdbuf();
   const std::string source = buffer.str();
 
-  if (endsWith(options.input, ".mini")) {
-    std::cerr << "error: MiniLang input is not supported yet.\n"
-              << "       The C++ front end (M1) is migration phase C; until it\n"
-              << "       lands, mtirc reads .cir modules.\n";
-    return 3;
-  }
-
   // The module takes its name from the file stem, so `mtirc --emit=ll
   // docs/examples/abs.cir` names the module "abs" -- which is what the golden
   // file records.
@@ -178,13 +174,71 @@ int main(int argc, char **argv) {
   if (dot != std::string::npos && dot != 0)
     moduleName = moduleName.substr(0, dot);
 
-  mtir::cir::ParseResult parsed =
-      mtir::cir::parseCir(source, moduleName, options.input);
-  if (!parsed.ok()) {
-    std::cerr << mtir::support::format(parsed.diagnostics);
-    return 1;
+  const bool isMiniLang = endsWith(options.input, ".mini");
+
+  // -- the two front-end-only stages ---------------------------------------
+  if (options.emit == "tokens" || options.emit == "ast") {
+    if (!isMiniLang)
+      return fail("--emit=" + options.emit + " needs a .mini source file");
+
+    if (options.emit == "tokens") {
+      mtir::frontend::LexResult lexed =
+          mtir::frontend::tokenize(source, options.input);
+      for (const mtir::ast::Token &tok : lexed.tokens) {
+        std::printf("%4d:%-4d %-12s '%s'\n", tok.loc.line, tok.loc.col,
+                    std::string(mtir::ast::tokKindName(tok.kind)).c_str(),
+                    tok.text.c_str());
+      }
+      if (!lexed.ok()) {
+        std::cerr << mtir::support::format(lexed.diagnostics);
+        return 1;
+      }
+      return 0;
+    }
+
+    mtir::frontend::ParseResult parsedAst =
+        mtir::frontend::parse(source, options.input);
+    if (!parsedAst.ok()) {
+      std::cerr << mtir::support::format(parsedAst.diagnostics);
+      return 1;
+    }
+    std::cout << mtir::ast::dump(*parsedAst.program);
+    return 0;
   }
-  mtir::cir::Module module = std::move(*parsed.module);
+
+  // -- .mini or .cir into a CIR module -------------------------------------
+  mtir::cir::Module module;
+  if (isMiniLang) {
+    mtir::frontend::ParseResult parsedAst =
+        mtir::frontend::parse(source, options.input);
+    if (!parsedAst.ok()) {
+      std::cerr << mtir::support::format(parsedAst.diagnostics);
+      return 1;
+    }
+
+    mtir::sema::AnalysisResult analysis =
+        mtir::sema::analyse(*parsedAst.program, options.input);
+    if (!analysis.ok()) {
+      std::cerr << mtir::support::format(analysis.diagnostics);
+      return 1;
+    }
+
+    mtir::cir::BuildResult built =
+        mtir::cir::build(*parsedAst.program, *analysis.types, moduleName);
+    if (!built.ok()) {
+      std::cerr << mtir::support::format(built.diagnostics);
+      return 1;
+    }
+    module = std::move(*built.module);
+  } else {
+    mtir::cir::ParseResult parsed =
+        mtir::cir::parseCir(source, moduleName, options.input);
+    if (!parsed.ok()) {
+      std::cerr << mtir::support::format(parsed.diagnostics);
+      return 1;
+    }
+    module = std::move(*parsed.module);
+  }
 
   if (options.optLevel > 0) {
     mtir::opt::PassManager pm = mtir::opt::defaultPipeline(options.optLevel);

@@ -11,6 +11,10 @@
 #
 #     mtir_support  ->  (nothing)
 #     mtir_cir      ->  mtir_support
+#     mtir_ast      ->  mtir_support
+#     mtir_frontend ->  mtir_ast, mtir_cir   (cir only for printDouble)
+#     mtir_sema     ->  mtir_ast, mtir_cir
+#     mtir_cirgen   ->  mtir_ast, mtir_sema, mtir_cir   (the CIR builder)
 #     mtir_opt      ->  mtir_cir
 #     mtir_llvm     ->  mtir_cir
 #     mtirc         ->  all of the above
@@ -86,6 +90,26 @@ add_library(mtir_cir
   src/cir/Parser.cpp)
 target_link_libraries(mtir_cir PUBLIC mtir_support PRIVATE mtir_warnings)
 
+# The front end.  AST.cpp uses cir::printDouble so that a float literal is
+# spelled the same way in an AST dump and in CIR text.
+add_library(mtir_frontend
+  src/frontend/Lexer.cpp
+  src/frontend/AST.cpp
+  src/frontend/Parser.cpp)
+target_link_libraries(mtir_frontend PUBLIC mtir_cir PRIVATE mtir_warnings)
+
+add_library(mtir_sema
+  src/sema/TypeInfo.cpp
+  src/sema/Analyse.cpp)
+target_link_libraries(mtir_sema PUBLIC mtir_frontend PRIVATE mtir_warnings)
+
+# The CIR builder lives in its own target, not in mtir_cir: that is what keeps
+# the CIR core free of any dependency on the AST, which in turn is what lets a
+# back end be built and tested against .cir text with no front end at all.
+add_library(mtir_cirgen
+  src/cir/Builder.cpp)
+target_link_libraries(mtir_cirgen PUBLIC mtir_sema mtir_cir PRIVATE mtir_warnings)
+
 add_library(mtir_opt
   src/opt/ConstantFolding.cpp
   src/opt/CopyPropagation.cpp
@@ -101,7 +125,8 @@ target_link_libraries(mtir_llvm PUBLIC mtir_cir PRIVATE mtir_warnings)
 
 # A convenience target for anything that wants the whole middle end.
 add_library(mtir_core INTERFACE)
-target_link_libraries(mtir_core INTERFACE mtir_cir mtir_opt mtir_llvm)
+target_link_libraries(mtir_core INTERFACE
+  mtir_cir mtir_frontend mtir_sema mtir_cirgen mtir_opt mtir_llvm)
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -122,7 +147,11 @@ if(BUILD_TESTING)
     tests/CFGTests.cpp
     tests/OptimizerTests.cpp
     tests/LLVMBackendTests.cpp
-    tests/CorpusTests.cpp)
+    tests/CorpusTests.cpp
+    tests/LexerTests.cpp
+    tests/ParserTests.cpp
+    tests/SemaTests.cpp
+    tests/BuilderTests.cpp)
   target_include_directories(mtir_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_link_libraries(mtir_tests PRIVATE mtir_core mtir_warnings)
   # Golden files live in the repository, so the tests need to know where that
