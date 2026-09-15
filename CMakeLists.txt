@@ -145,8 +145,13 @@ target_link_libraries(mtir_core INTERFACE
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+# The driver is a library so the end-to-end tests can call it directly rather
+# than spawning the executable; main.cpp is a thin wrapper over it.
+add_library(mtir_driver src/tool/Driver.cpp)
+target_link_libraries(mtir_driver PUBLIC mtir_core PRIVATE mtir_warnings)
+
 add_executable(mtirc tools/mtirc/main.cpp)
-target_link_libraries(mtirc PRIVATE mtir_core mtir_warnings)
+target_link_libraries(mtirc PRIVATE mtir_driver mtir_warnings)
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -168,9 +173,10 @@ if(BUILD_TESTING)
     tests/BuilderTests.cpp
     tests/StackTests.cpp
     tests/WasmTests.cpp
-    tests/StackVMTests.cpp)
+    tests/StackVMTests.cpp
+    tests/DriverTests.cpp)
   target_include_directories(mtir_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-  target_link_libraries(mtir_tests PRIVATE mtir_core mtir_warnings)
+  target_link_libraries(mtir_tests PRIVATE mtir_driver mtir_warnings)
   # Golden files live in the repository, so the tests need to know where that
   # is regardless of the working directory the runner uses.
   target_compile_definitions(mtir_tests
