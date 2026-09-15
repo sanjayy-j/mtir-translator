@@ -7,8 +7,43 @@ on:
     branches: [main]
 
 jobs:
+  # ---------------------------------------------------------------------
+  # The C++17 implementation.  This is the job that matters: C++ is the
+  # project's implementation language, and the Python job below runs only
+  # while the prototype is still the reference for the parts of the
+  # pipeline that have not been migrated yet (front end, semantic
+  # analysis, WebAssembly and stack back ends).
+  # ---------------------------------------------------------------------
+  cpp:
+    name: Build and test the C++ implementation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm
+
+      - name: Configure
+        # No -DMTIR_WERROR=ON yet: the code has been compiled clean with
+        # MSVC at /W4 but has not been built with GCC, so the first CI run
+        # is expected to surface warnings that nobody has triaged.
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      # Runs the unit tests, the two golden-file checks through mtirc, and
+      # llvm-as over the generated IR.  The llvm-as test reports SKIPPED
+      # rather than passing when the tool is absent, so a run that validated
+      # nothing cannot be mistaken for one that did.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
   test:
-    name: Verify environment and run tests
+    name: Python reference implementation (retired at migration phase K)
     runs-on: ubuntu-latest
 
     steps:

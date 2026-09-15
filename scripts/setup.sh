@@ -3,11 +3,16 @@
 # Owner: Member 2.
 #
 # This script is the authoritative definition of "a working environment".
-# It runs as the first CI step, so a member's local machine and the CI
-# environment cannot silently diverge.
+# It runs as a CI step, so a member's local machine and the CI environment
+# cannot silently diverge.
 #
 #   bash scripts/setup.sh          # verify only
-#   bash scripts/setup.sh --install-python-deps
+#   bash scripts/setup.sh --build  # verify, then configure and build
+#
+# The project is C++17.  Python is still installed-and-checked because the
+# prototype in src/**/*.py is the behavioural reference for the parts of the
+# pipeline not yet migrated; it is reported as optional, not required, and
+# these checks go away with the prototype.
 
 set -u
 
@@ -16,48 +21,81 @@ ok()   { printf '  \033[32mok\033[0m    %s\n' "$1"; }
 warn() { printf '  \033[33mwarn\033[0m  %s\n' "$1"; }
 bad()  { printf '  \033[31mMISSING\033[0m %s\n' "$1"; FAIL=1; }
 
-echo "== Required =="
-if command -v python3 >/dev/null 2>&1; then
-  ok "python3 $(python3 --version 2>&1 | cut -d' ' -f2)"
-  python3 - <<'PY' || FAIL=1
-import sys
-if sys.version_info < (3, 11):
-    print("  Python 3.11+ is required (match statement in ast_nodes.dump)")
-    raise SystemExit(1)
-PY
+echo "== Required: the C++17 toolchain =="
+if command -v cmake >/dev/null 2>&1; then
+  ok "cmake $(cmake --version | head -1 | cut -d' ' -f3)"
 else
-  bad "python3 (3.11+)"
+  bad "cmake (3.16+)"
+fi
+
+CXX_FOUND=0
+for compiler in "${CXX:-}" g++ clang++ c++; do
+  [ -z "$compiler" ] && continue
+  if command -v "$compiler" >/dev/null 2>&1; then
+    ok "$compiler $("$compiler" --version 2>/dev/null | head -1)"
+    CXX_FOUND=1
+    break
+  fi
+done
+if [ "$CXX_FOUND" -eq 0 ]; then
+  if command -v cl >/dev/null 2>&1; then
+    ok "cl (MSVC)"
+  else
+    bad "a C++17 compiler (g++ 8+, clang++ 7+, or MSVC 2019+)"
+  fi
 fi
 
 command -v git >/dev/null 2>&1 && ok "git $(git --version | cut -d' ' -f3)" || bad "git"
 
 echo
-echo "== Back-end toolchain (needed from Week 6; not required for Review 1) =="
-command -v llvm-as  >/dev/null 2>&1 && ok "llvm-as  $(llvm-as --version 2>/dev/null | head -1)"  || warn "llvm-as not found  (LLVM 17+, needed Week 6)"
-command -v lli      >/dev/null 2>&1 && ok "lli"      || warn "lli not found      (LLVM 17+, needed Week 7)"
-command -v wat2wasm >/dev/null 2>&1 && ok "wat2wasm $(wat2wasm --version 2>/dev/null)"           || warn "wat2wasm not found (WABT 1.0.34+, needed Week 7)"
-command -v wasmtime >/dev/null 2>&1 && ok "wasmtime $(wasmtime --version 2>/dev/null)"           || warn "wasmtime not found (18+, needed Week 8)"
-command -v node     >/dev/null 2>&1 && ok "node $(node --version)"                               || warn "node not found      (20 LTS, needed Week 8)"
+echo "== Optional: back-end validation tools =="
+command -v llvm-as  >/dev/null 2>&1 && ok "llvm-as  $(llvm-as --version 2>/dev/null | head -1)" || warn "llvm-as not found  -- the LLVM validation test will report SKIPPED"
+command -v lli      >/dev/null 2>&1 && ok "lli"                                                  || warn "lli not found      (needed to execute generated IR)"
+command -v wat2wasm >/dev/null 2>&1 && ok "wat2wasm $(wat2wasm --version 2>/dev/null)"           || warn "wat2wasm not found (WABT, needed by the Wasm back end)"
+command -v wasmtime >/dev/null 2>&1 && ok "wasmtime $(wasmtime --version 2>/dev/null)"           || warn "wasmtime not found (needed to execute generated Wasm)"
 
-if [ "${1:-}" = "--install-python-deps" ]; then
-  echo
-  echo "== Installing Python dev dependencies =="
-  python3 -m pip install -r requirements.txt
+echo
+echo "== Optional: the Python reference implementation =="
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+  ok "python3 $(python3 --version 2>&1 | cut -d' ' -f2) -- the prototype in src/**/*.py can run"
+else
+  warn "python3 3.11+ not found -- the C++ build does not need it, but the reference suite will not run"
 fi
 
 echo
 echo "== Smoke test =="
-python3 -m src.driver --emit=tokens docs/examples/abs.mini >/dev/null 2>&1 \
-  && ok "lexer runs" || { bad "lexer smoke test"; }
-python3 -m src.driver --emit=ast docs/examples/abs.mini >/dev/null 2>&1 \
-  && ok "parser runs" || { bad "parser smoke test"; }
-if python3 -m src.driver --demo-cir 2>/dev/null | diff -q - docs/examples/abs.cir >/dev/null; then
-  ok "CIR printer output matches docs/examples/abs.cir"
-else
-  bad "CIR printer golden-file check"
+BUILD_DIR="${BUILD_DIR:-build}"
+if [ "${1:-}" = "--build" ]; then
+  cmake -S . -B "$BUILD_DIR" >/dev/null && cmake --build "$BUILD_DIR" >/dev/null \
+    && ok "configured and built into $BUILD_DIR" || bad "cmake build"
 fi
 
-# Validate the hand-written target files, when the toolchain is present.
+MTIRC=""
+for candidate in "$BUILD_DIR/mtirc" "$BUILD_DIR/mtirc.exe" "$BUILD_DIR/Debug/mtirc.exe" "$BUILD_DIR/Release/mtirc.exe"; do
+  [ -x "$candidate" ] && MTIRC="$candidate" && break
+done
+
+if [ -n "$MTIRC" ]; then
+  if "$MTIRC" --emit=cir docs/examples/abs.cir 2>/dev/null | diff -q - docs/examples/abs.cir >/dev/null; then
+    ok "mtirc --emit=cir round-trips docs/examples/abs.cir"
+  else
+    bad "CIR round-trip golden check"
+  fi
+  if "$MTIRC" --emit=ll docs/examples/abs.cir 2>/dev/null | diff -q - docs/examples/abs.gen.ll >/dev/null; then
+    ok "mtirc --emit=ll matches docs/examples/abs.gen.ll"
+  else
+    bad "LLVM golden check"
+  fi
+  if command -v llvm-as >/dev/null 2>&1; then
+    "$MTIRC" --emit=ll docs/examples/abs.cir -o /tmp/mtir-smoke.ll 2>/dev/null \
+      && llvm-as /tmp/mtir-smoke.ll -o /tmp/mtir-smoke.bc 2>/dev/null \
+      && ok "llvm-as accepts the generated IR" || bad "llvm-as rejected the generated IR"
+  fi
+else
+  warn "mtirc not built yet -- run 'bash scripts/setup.sh --build' or 'cmake -S . -B build && cmake --build build'"
+fi
+
+# The hand-written worked examples, when the toolchain is present.
 if command -v llvm-as >/dev/null 2>&1; then
   llvm-as docs/examples/abs.ll -o /tmp/abs.bc 2>/dev/null \
     && ok "docs/examples/abs.ll accepted by llvm-as" || bad "abs.ll failed llvm-as"
@@ -69,7 +107,7 @@ fi
 
 echo
 if [ "$FAIL" -eq 0 ]; then
-  echo "Environment OK. Run: python3 -m pytest -q"
+  echo "Environment OK. Run: ctest --test-dir $BUILD_DIR --output-on-failure"
 else
   echo "Environment INCOMPLETE — see MISSING lines above."
 fi
