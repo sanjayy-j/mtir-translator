@@ -1,3 +1,22 @@
+# C++ build artefacts
+build/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.exe
+*.pdb
+*.ilk
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+Testing/
+.cache/
+
+# Python reference implementation (removed with the prototype)
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -12,7 +31,6 @@ venv/
 *.wat
 *.wasm
 *.sbc
-build/
 out/
 
 # Keep the hand-written worked examples, which are checked-in evidence
