@@ -1,0 +1,27 @@
+func @main() -> i32 {
+entry:
+  %a.addr = alloca i32
+  %b.addr = alloca i32
+  %c.addr = alloca i32
+  %d.addr = alloca i32
+  %t0 = mul i32 3, 4
+  %t1 = add i32 2, %t0
+  store i32 %t1, %a.addr
+  %t2 = add i32 2, 3
+  %t3 = mul i32 %t2, 4
+  store i32 %t3, %b.addr
+  %t4 = srem i32 17, 5
+  store i32 %t4, %c.addr
+  %t5 = shl i32 1, 4
+  %t6 = or i32 %t5, 3
+  store i32 %t6, %d.addr
+  %t7 = load i32 %a.addr
+  %t8 = load i32 %b.addr
+  %t9 = add i32 %t7, %t8
+  %t10 = load i32 %c.addr
+  %t11 = add i32 %t9, %t10
+  %t12 = load i32 %d.addr
+  %t13 = add i32 %t11, %t12
+  print.i32 %t13
+  ret i32 0
+}

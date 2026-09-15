@@ -1,0 +1,12 @@
+func @main() -> i32 {
+entry:
+  %t0 = shl i32 1, 0
+  print.i32 %t0
+  %t1 = shl i32 1, 31
+  print.i32 %t1
+  %t2 = shl i32 1, 32
+  print.i32 %t2
+  %t3 = shl i32 1, 33
+  print.i32 %t3
+  ret i32 0
+}

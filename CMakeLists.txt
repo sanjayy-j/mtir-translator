@@ -121,7 +121,8 @@ if(BUILD_TESTING)
     tests/CIRTextTests.cpp
     tests/CFGTests.cpp
     tests/OptimizerTests.cpp
-    tests/LLVMBackendTests.cpp)
+    tests/LLVMBackendTests.cpp
+    tests/CorpusTests.cpp)
   target_include_directories(mtir_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_link_libraries(mtir_tests PRIVATE mtir_core mtir_warnings)
   # Golden files live in the repository, so the tests need to know where that

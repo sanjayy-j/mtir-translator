@@ -1,0 +1,76 @@
+func @classify(i32 %n) -> i32 {
+entry:
+  %t0 = icmp.slt i32 %n, 0
+  br %t0 ? if.then.0 : if.else.0
+if.then.0:
+  ret i32 -1
+if.else.0:
+  %t1 = icmp.eq i32 %n, 0
+  br %t1 ? if.then.1 : if.else.1
+if.then.1:
+  ret i32 0
+if.else.1:
+  ret i32 1
+}
+func @main() -> i32 {
+entry:
+  %total.addr = alloca i32
+  %i.addr = alloca i32
+  %j.addr = alloca i32
+  store i32 0, %total.addr
+  store i32 0, %i.addr
+  br while.head.0
+while.head.0:
+  %t0 = load i32 %i.addr
+  %t1 = icmp.slt i32 %t0, 10
+  br %t1 ? while.body.0 : while.end.0
+while.body.0:
+  %t2 = load i32 %i.addr
+  %t3 = srem i32 %t2, 2
+  %t4 = icmp.eq i32 %t3, 0
+  br %t4 ? if.then.1 : if.end.1
+if.then.1:
+  %t5 = load i32 %i.addr
+  %t6 = add i32 %t5, 1
+  store i32 %t6, %i.addr
+  br while.head.0
+if.end.1:
+  %t7 = load i32 %i.addr
+  %t8 = icmp.sgt i32 %t7, 7
+  br %t8 ? if.then.2 : if.end.2
+if.then.2:
+  br while.end.0
+if.end.2:
+  %t9 = load i32 %total.addr
+  %t10 = load i32 %i.addr
+  %t11 = add i32 %t9, %t10
+  store i32 %t11, %total.addr
+  %t12 = load i32 %i.addr
+  %t13 = add i32 %t12, 1
+  store i32 %t13, %i.addr
+  br while.head.0
+while.end.0:
+  store i32 0, %j.addr
+  br for.head.3
+for.head.3:
+  %t14 = load i32 %j.addr
+  %t15 = icmp.slt i32 %t14, 3
+  br %t15 ? for.body.3 : for.end.3
+for.body.3:
+  %t16 = load i32 %total.addr
+  %t17 = load i32 %j.addr
+  %t18 = sub i32 %t17, 1
+  %t19 = call i32 @classify(%t18)
+  %t20 = add i32 %t16, %t19
+  store i32 %t20, %total.addr
+  br for.step.3
+for.step.3:
+  %t21 = load i32 %j.addr
+  %t22 = add i32 %t21, 1
+  store i32 %t22, %j.addr
+  br for.head.3
+for.end.3:
+  %t23 = load i32 %total.addr
+  print.i32 %t23
+  ret i32 0
+}

@@ -1,0 +1,13 @@
+func @div(i32 %a, i32 %b) -> i32 {
+entry:
+  %t0 = sdiv i32 %a, %b
+  ret i32 %t0
+}
+func @main() -> i32 {
+entry:
+  %t0 = call i32 @div(7, 2)
+  print.i32 %t0
+  %t1 = call i32 @div(-2147483648, -1)
+  print.i32 %t1
+  ret i32 0
+}
