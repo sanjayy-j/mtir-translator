@@ -95,6 +95,43 @@ TERMINATORS = {"br", "br.cond", "ret"}
 ALL_OPS = (ARITH_OPS | BIT_OPS | CMP_OPS | CONV_OPS | MEM_OPS
            | CALL_OPS | INTRINSICS | TERMINATORS)
 
+# Opcodes taking exactly one operand.  Everything else in ARITH_OPS/BIT_OPS is
+# binary, which is what lets the printer and the text parser share one shape.
+UNARY_OPS = {"neg", "not"}
+
+# Integer types and their widths, in bits.  Used by the constant folder to
+# wrap results and mask shift counts (docs/divergence.md rows 3 and 4), and by
+# the LLVM back end to pick the mask for a shift guard.
+INT_WIDTH = {Ty.I1: 1, Ty.I32: 32, Ty.I64: 64}
+
+FLOAT_OPS = {"fadd", "fsub", "fmul", "fdiv"}
+
+# Instructions that may not be deleted even when their result is unused,
+# because executing them is itself observable (output, a trap, or a store).
+SIDE_EFFECTING = {"store", "call", "trap"} | {o for o in INTRINSICS if o != "trap"}
+
+
+def is_cmp(op: str) -> bool:
+    return op.startswith("icmp.") or op.startswith("fcmp.")
+
+
+def result_ty(op: str, ty: Ty) -> Ty:
+    """The type of the register an instruction defines, given its printed type.
+
+    The textual form carries one type per instruction, which for most opcodes
+    is the result type.  Two families differ, and both are resolved here so
+    that the printer, the text parser and every back end agree:
+
+      * comparisons print the *operand* type and always produce ``i1``
+        (docs/cir-spec.md rule 7);
+      * ``alloca`` prints the *element* type and produces a ``ptr``.
+    """
+    if is_cmp(op):
+        return Ty.I1
+    if op in ("alloca", "gep"):
+        return Ty.PTR
+    return ty
+
 
 @dataclass
 class Instr:
@@ -170,3 +207,16 @@ class Module:
 
     def function(self, name: str) -> Optional[Function]:
         return next((f for f in self.functions if f.name == name), None)
+
+
+def wrap_int(value: int, ty: Ty) -> int:
+    """Reduce ``value`` to the two's-complement range of ``ty``.
+
+    CIR fixes integer overflow as wraparound (docs/divergence.md row 4), so
+    every place that computes an integer constant -- the builder, the constant
+    folder and the LLVM emitter -- funnels through this one function rather
+    than each having its own idea of what i32 arithmetic means.
+    """
+    bits = INT_WIDTH[ty]
+    value &= (1 << bits) - 1
+    return value - (1 << bits) if value >> (bits - 1) else value
