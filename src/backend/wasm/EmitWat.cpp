@@ -76,16 +76,10 @@ private:
     return 0;
   }
 
-  /// Byte offset of each alloca'd pointer register within the frame, and the
-  /// total frame size.  Both are recomputed per function.
-  std::map<std::string, std::int64_t> frameOffset_;
-  std::int64_t frameSize_ = 0;
+  /// This function's frame, recomputed per function.
+  FrameLayout frame_;
 
-  /// Lay out the function's allocas in its stack frame.
-  void computeFrame(const Function &fn);
-
-  /// The block with every alloca replaced by frame-relative address
-  /// arithmetic, so the ordinary lowering can handle it.
+  /// resolveAllocas, plus the one check that is specific to WebAssembly.
   BasicBlock withAllocasResolved(const Function &fn, const BasicBlock &block);
 
   support::Diagnostics &diags_;
@@ -96,58 +90,23 @@ private:
 /// Top of linear memory, and so the initial shadow stack pointer.  One page.
 constexpr std::int64_t kStackTop = 65536;
 
-/// The shadow stack grows down from kStackTop; frames are kept 8-byte aligned
-/// so that an i64 or f64 slot is naturally aligned.
-constexpr std::int64_t kFrameAlign = 8;
-
-std::int64_t roundUp(std::int64_t n, std::int64_t multiple) {
-  return ((n + multiple - 1) / multiple) * multiple;
-}
-
-void FunctionEmitter::computeFrame(const Function &fn) {
-  frameOffset_.clear();
-  frameSize_ = 0;
-  for (const BasicBlock &b : fn.blocks())
-    for (const Instruction &i : b.instructions()) {
-      if (i.op != Opcode::Alloca || !i.dest.has_value())
-        continue;
-      const std::int64_t elem = sizeOf(i.ty);
-      std::int64_t count = 1;
-      if (!i.args.empty())
-        if (const ConstInt *c = asConstInt(i.args[0]))
-          count = c->value > 0 ? c->value : 1;
-      frameSize_ = roundUp(frameSize_, elem);
-      frameOffset_[i.dest->name] = frameSize_;
-      frameSize_ += elem * count;
-    }
-  frameSize_ = roundUp(frameSize_, kFrameAlign);
-}
+/// The register the rewritten allocas read.  Not a CIR register: the emitter
+/// adds it to the local table so the operand pushes resolve.
+const char *const kFrameReg = "__frame";
 
 BasicBlock FunctionEmitter::withAllocasResolved(const Function &fn,
                                                 const BasicBlock &block) {
-  BasicBlock out(block.label());
-  for (const Instruction &i : block.instructions()) {
-    if (i.op != Opcode::Alloca || !i.dest.has_value()) {
-      // A gep off a global would need the global to live in linear memory,
-      // and a CIR global is a WebAssembly global.  Refuse rather than emit
-      // an address that is really a value.
-      if (i.op == Opcode::GEP && !i.args.empty() &&
-          std::holds_alternative<GlobalRef>(i.args[0]))
-        error(fn, block,
-              "cannot index a global array: a CIR global becomes a WebAssembly "
-              "global, which has no address in linear memory");
-      out.add(i);
-      continue;
-    }
-    // `%p = alloca T` becomes `%p = add i32 $__frame, offset`, which the
-    // ordinary lowering, and the peephole with it, already understands.
-    const auto it = frameOffset_.find(i.dest->name);
-    const std::int64_t offset = it == frameOffset_.end() ? 0 : it->second;
-    out.add(Instruction::binary(Opcode::Add, Ty::I32, *i.dest,
-                                Reg{"__frame", Ty::Ptr},
-                                ConstInt{offset, Ty::I32}));
-  }
-  return out;
+  // A gep off a global would need the global to live in linear memory, and a
+  // CIR global becomes a WebAssembly global, which has no address.  Refuse
+  // rather than emit an address that is really a value.
+  for (const Instruction &i : block.instructions())
+    if (i.op == Opcode::GEP && !i.args.empty() &&
+        std::holds_alternative<GlobalRef>(i.args[0]))
+      error(fn, block,
+            "cannot index a global array: a CIR global becomes a WebAssembly "
+            "global, which has no address in linear memory");
+
+  return resolveAllocas(block, frame_, kFrameReg);
 }
 
 void FunctionEmitter::emitBlock(const Function &fn, const BasicBlock &block,
@@ -190,7 +149,7 @@ void FunctionEmitter::emitBlock(const Function &fn, const BasicBlock &block,
        peephole(seq, blockUseCounts(resolved, locals), blockLiveOut(fn, block, locals))) {
     // Every exit restores the caller's shadow stack pointer.  The pair is
     // stack-neutral, so inserting it under an already-pushed result is safe.
-    if (op.op == "return" && frameSize_ > 0) {
+    if (op.op == "return" && frame_.size > 0) {
       line(depth, "local.get $__fp");
       line(depth, "global.set $__sp");
     }
@@ -229,14 +188,14 @@ void FunctionEmitter::emitBlock(const Function &fn, const BasicBlock &block,
 void FunctionEmitter::emitTower(const Function &fn, const LocalTable &locals) {
   const std::size_t n = fn.blocks().size();
 
-  if (frameSize_ > 0) {
+  if (frame_.size > 0) {
     // Open a stack frame: remember the caller's shadow stack pointer, drop
     // the frame below it, and keep the frame base in a local so that each
     // alloca is one add away and a call in between cannot disturb it.
     line(2, "global.get $__sp");
     line(2, "local.set $__fp");
     line(2, "local.get $__fp");
-    line(2, "i32.const " + std::to_string(frameSize_));
+    line(2, "i32.const " + std::to_string(frame_.size));
     line(2, "i32.sub");
     line(2, "local.set $__frame");
     line(2, "local.get $__frame");
@@ -284,12 +243,12 @@ void FunctionEmitter::emitTower(const Function &fn, const LocalTable &locals) {
 std::string FunctionEmitter::emit(const Function &fn) {
   out_.clear();
   usedLocals_.clear();
-  computeFrame(fn);
+  frame_ = layoutFrame(fn);
 
   LocalTable locals = localTable(fn);
   // $__frame is not a CIR register, but the rewritten allocas read it like
   // one, so it needs an entry for the operand pushes to resolve.
-  locals["__frame"] = "$__frame";
+  locals[kFrameReg] = std::string("$") + kFrameReg;
 
   // The tower is emitted first, into out_, because which locals need
   // declaring is only known after the peephole has run: a temporary that
@@ -331,7 +290,7 @@ std::string FunctionEmitter::emit(const Function &fn) {
   for (const auto &entry : localTypes)
     line(2, "(local " + entry.first + " " + watType(entry.second) + ")");
   line(2, "(local $__block i32)");
-  if (frameSize_ > 0) {
+  if (frame_.size > 0) {
     line(2, "(local $__fp i32)");
     line(2, "(local $__frame i32)");
   }

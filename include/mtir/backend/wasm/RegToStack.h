@@ -136,6 +136,32 @@ std::vector<StackOp> lowerBlock(const cir::BasicBlock &block, const LocalTable &
                                 const std::map<std::string, int> &useCount,
                                 const std::set<std::string> &liveOut);
 
+/// Where each alloca'd pointer lives in its function's stack frame.
+///
+/// A stack machine has no addressable locals, so a MiniLang variable whose
+/// address is taken -- which, before optimisation, is every variable -- needs
+/// a slot in linear memory rather than a local.  Both stack back ends
+/// therefore give each function a frame: the WebAssembly emitter carves it
+/// out of linear memory behind a shadow stack pointer, and the bytecode VM
+/// allocates one per call.  The layout itself is the same, so it lives here.
+struct FrameLayout {
+  /// Total frame size in bytes, rounded up so the next frame stays 8-byte
+  /// aligned and an i64 or f64 slot is naturally aligned.
+  std::int64_t size = 0;
+
+  /// Byte offset of each alloca'd pointer register from the frame base.
+  std::map<std::string, std::int64_t> offset;
+};
+
+FrameLayout layoutFrame(const cir::Function &fn);
+
+/// `block` with every `%p = alloca T` replaced by `%p = add i32 %frameReg,
+/// offset`, so that ordinary three-address lowering -- and the peephole with
+/// it -- handles what is really just address arithmetic.  `frameReg` names a
+/// register holding the frame base, which each back end supplies itself.
+cir::BasicBlock resolveAllocas(const cir::BasicBlock &block, const FrameLayout &frame,
+                               const std::string &frameReg);
+
 /// Every block of a function, in order.  Parallel to fn.blocks().
 std::vector<std::vector<StackOp>> lowerFunction(const cir::Function &fn);
 

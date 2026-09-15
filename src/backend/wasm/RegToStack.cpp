@@ -374,6 +374,52 @@ std::vector<StackOp> lowerBlock(const BasicBlock &block, const LocalTable &local
   return peephole(lowerBlockNaive(block, locals), useCount, liveOut);
 }
 
+namespace {
+
+/// Frames stay 8-byte aligned so an i64 or f64 slot is naturally aligned.
+constexpr std::int64_t kFrameAlign = 8;
+
+std::int64_t roundUp(std::int64_t n, std::int64_t multiple) {
+  return ((n + multiple - 1) / multiple) * multiple;
+}
+
+} // namespace
+
+FrameLayout layoutFrame(const Function &fn) {
+  FrameLayout frame;
+  for (const BasicBlock &b : fn.blocks())
+    for (const Instruction &i : b.instructions()) {
+      if (i.op != Opcode::Alloca || !i.dest.has_value())
+        continue;
+      const std::int64_t elem = sizeOf(i.ty);
+      std::int64_t count = 1;
+      if (!i.args.empty())
+        if (const ConstInt *c = asConstInt(i.args[0]))
+          count = c->value > 0 ? c->value : 1;
+      frame.size = roundUp(frame.size, elem);
+      frame.offset[i.dest->name] = frame.size;
+      frame.size += elem * count;
+    }
+  frame.size = roundUp(frame.size, kFrameAlign);
+  return frame;
+}
+
+BasicBlock resolveAllocas(const BasicBlock &block, const FrameLayout &frame,
+                          const std::string &frameReg) {
+  BasicBlock out(block.label());
+  for (const Instruction &i : block.instructions()) {
+    if (i.op != Opcode::Alloca || !i.dest.has_value()) {
+      out.add(i);
+      continue;
+    }
+    const auto it = frame.offset.find(i.dest->name);
+    const std::int64_t offset = it == frame.offset.end() ? 0 : it->second;
+    out.add(Instruction::binary(Opcode::Add, Ty::I32, *i.dest,
+                                Reg{frameReg, Ty::Ptr}, ConstInt{offset, Ty::I32}));
+  }
+  return out;
+}
+
 std::vector<std::vector<StackOp>> lowerFunction(const Function &fn) {
   const LocalTable locals = localTable(fn);
   std::vector<std::vector<StackOp>> out;

@@ -29,6 +29,8 @@
 
 #include "mtir/ast/AST.h"
 #include "mtir/backend/llvm/EmitLL.h"
+#include "mtir/backend/stackvm/EmitSbc.h"
+#include "mtir/backend/stackvm/VM.h"
 #include "mtir/backend/wasm/EmitWat.h"
 #include "mtir/cir/Builder.h"
 #include "mtir/cir/Parser.h"
@@ -48,11 +50,14 @@ usage: mtirc [options] <file>
   <file>            a .mini source or a .cir module
 
 options:
-  --emit=<stage>    tokens | ast | cir | ll | wat  (default: cir)
+  --emit=<stage>    tokens | ast | cir | ll | wat | sbc   (default: cir)
   --opt=<level>     0 | 1           (default: 0)
                     1 = constant folding, copy propagation, dead-code
                         elimination, run to a fixed point
   --verify          run the CIR verifier and report any diagnostics
+  --run             execute the program on the reference stack VM and print
+                    whatever it wrote; the exit status is 4 if it trapped
+  --entry=<name>    entry point for --run                 (default: main)
   -o <file>         write to <file> instead of standard output
   --version         print the version and exit
   -h, --help        print this message and exit
@@ -64,6 +69,8 @@ struct Options {
   std::string emit = "cir";
   int optLevel = 0;
   bool verify = false;
+  bool runIt = false;
+  std::string entry = "main";
 };
 
 bool startsWith(const std::string &s, const std::string &prefix) {
@@ -75,29 +82,9 @@ bool endsWith(const std::string &s, const std::string &suffix) {
          s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
-/// Stages the Python prototype supports that the C++ migration has not
-/// reached yet.  Naming the owner and the phase keeps the report honest.
-int notYetImplemented(const std::string &stage) {
-  struct Pending {
-    const char *stage;
-    const char *module;
-    const char *owner;
-    const char *phase;
-  };
-  static const Pending pending[] = {
-      {"sbc", "stack bytecode back end (M7)", "Member 4", "migration phase H"},
-  };
-  for (const Pending &p : pending) {
-    if (stage == p.stage) {
-      std::cerr << "error: --emit=" << stage << " is not implemented yet.\n"
-                << "       " << p.module << " is owned by " << p.owner
-                << " and is scheduled for " << p.phase << ".\n"
-                << "       Implemented today: --emit=cir, --emit=ll, --emit=wat.\n";
-      return 3;
-    }
-  }
+int unknownStage(const std::string &stage) {
   std::cerr << "error: unknown stage '" << stage
-            << "'. Known stages: tokens, ast, cir, ll, wat.\n";
+            << "'. Known stages: tokens, ast, cir, ll, wat, sbc.\n";
   return 1;
 }
 
@@ -129,6 +116,10 @@ int main(int argc, char **argv) {
     }
     if (arg == "--verify") {
       options.verify = true;
+    } else if (arg == "--run") {
+      options.runIt = true;
+    } else if (startsWith(arg, "--entry=")) {
+      options.entry = arg.substr(8);
     } else if (startsWith(arg, "--emit=")) {
       options.emit = arg.substr(7);
     } else if (startsWith(arg, "--opt=")) {
@@ -146,8 +137,8 @@ int main(int argc, char **argv) {
   }
 
   if (options.emit != "tokens" && options.emit != "ast" && options.emit != "cir" &&
-      options.emit != "ll" && options.emit != "wat")
-    return notYetImplemented(options.emit);
+      options.emit != "ll" && options.emit != "wat" && options.emit != "sbc")
+    return unknownStage(options.emit);
 
   if (options.input.empty()) {
     std::cerr << kUsage;
@@ -254,9 +245,41 @@ int main(int argc, char **argv) {
     }
   }
 
+  // --run short-circuits the emitters: the VM executes the bytecode
+  // directly, so nothing needs to be printed as text first.
+  if (options.runIt) {
+    mtir::backend::stackvm::EmitResult lowered =
+        mtir::backend::stackvm::emitModule(module);
+    if (!lowered.diagnostics.empty())
+      std::cerr << mtir::support::format(lowered.diagnostics);
+    if (!lowered.ok())
+      return 1;
+
+    mtir::backend::stackvm::RunOptions runOptions;
+    runOptions.entry = options.entry;
+    const mtir::backend::stackvm::RunResult outcome =
+        mtir::backend::stackvm::run(lowered.program, runOptions);
+
+    std::cout << outcome.output;
+    std::cout.flush();
+    if (outcome.trapped) {
+      std::cerr << "trap: " << outcome.trap << "\n";
+      return 4;
+    }
+    return 0;
+  }
+
   std::string text;
   if (options.emit == "cir") {
     text = mtir::cir::printModule(module);
+  } else if (options.emit == "sbc") {
+    mtir::backend::stackvm::EmitResult result =
+        mtir::backend::stackvm::emitModule(module);
+    if (!result.diagnostics.empty())
+      std::cerr << mtir::support::format(result.diagnostics);
+    if (!result.ok())
+      return 1;
+    text = mtir::backend::stackvm::printProgram(result.program);
   } else if (options.emit == "wat") {
     mtir::backend::wasm::EmitResult result = mtir::backend::wasm::emitModule(module);
     if (!result.diagnostics.empty())

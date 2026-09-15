@@ -130,10 +130,17 @@ add_library(mtir_wasm
   src/backend/wasm/EmitWat.cpp)
 target_link_libraries(mtir_wasm PUBLIC mtir_cir PRIVATE mtir_warnings)
 
+# The bytecode back end and its VM.  Depends on mtir_wasm for the shared
+# register-to-stack pass, not for anything WebAssembly-specific.
+add_library(mtir_stackvm
+  src/backend/stackvm/EmitSbc.cpp
+  src/backend/stackvm/VM.cpp)
+target_link_libraries(mtir_stackvm PUBLIC mtir_cir mtir_wasm PRIVATE mtir_warnings)
+
 # A convenience target for anything that wants the whole middle end.
 add_library(mtir_core INTERFACE)
 target_link_libraries(mtir_core INTERFACE
-  mtir_cir mtir_frontend mtir_sema mtir_cirgen mtir_opt mtir_llvm mtir_wasm)
+  mtir_cir mtir_frontend mtir_sema mtir_cirgen mtir_opt mtir_llvm mtir_wasm mtir_stackvm)
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -160,7 +167,8 @@ if(BUILD_TESTING)
     tests/SemaTests.cpp
     tests/BuilderTests.cpp
     tests/StackTests.cpp
-    tests/WasmTests.cpp)
+    tests/WasmTests.cpp
+    tests/StackVMTests.cpp)
   target_include_directories(mtir_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_link_libraries(mtir_tests PRIVATE mtir_core mtir_warnings)
   # Golden files live in the repository, so the tests need to know where that
