@@ -29,6 +29,7 @@
 
 #include "mtir/ast/AST.h"
 #include "mtir/backend/llvm/EmitLL.h"
+#include "mtir/backend/wasm/EmitWat.h"
 #include "mtir/cir/Builder.h"
 #include "mtir/cir/Parser.h"
 #include "mtir/frontend/Lexer.h"
@@ -47,7 +48,7 @@ usage: mtirc [options] <file>
   <file>            a .mini source or a .cir module
 
 options:
-  --emit=<stage>    tokens | ast | cir | ll        (default: cir)
+  --emit=<stage>    tokens | ast | cir | ll | wat  (default: cir)
   --opt=<level>     0 | 1           (default: 0)
                     1 = constant folding, copy propagation, dead-code
                         elimination, run to a fixed point
@@ -84,7 +85,6 @@ int notYetImplemented(const std::string &stage) {
     const char *phase;
   };
   static const Pending pending[] = {
-      {"wat", "WebAssembly back end (M6c)", "Member 4", "migration phase H"},
       {"sbc", "stack bytecode back end (M7)", "Member 4", "migration phase H"},
   };
   for (const Pending &p : pending) {
@@ -92,12 +92,12 @@ int notYetImplemented(const std::string &stage) {
       std::cerr << "error: --emit=" << stage << " is not implemented yet.\n"
                 << "       " << p.module << " is owned by " << p.owner
                 << " and is scheduled for " << p.phase << ".\n"
-                << "       Implemented today: --emit=cir, --emit=ll.\n";
+                << "       Implemented today: --emit=cir, --emit=ll, --emit=wat.\n";
       return 3;
     }
   }
   std::cerr << "error: unknown stage '" << stage
-            << "'. Known stages: cir, ll.\n";
+            << "'. Known stages: tokens, ast, cir, ll, wat.\n";
   return 1;
 }
 
@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
   }
 
   if (options.emit != "tokens" && options.emit != "ast" && options.emit != "cir" &&
-      options.emit != "ll")
+      options.emit != "ll" && options.emit != "wat")
     return notYetImplemented(options.emit);
 
   if (options.input.empty()) {
@@ -257,6 +257,13 @@ int main(int argc, char **argv) {
   std::string text;
   if (options.emit == "cir") {
     text = mtir::cir::printModule(module);
+  } else if (options.emit == "wat") {
+    mtir::backend::wasm::EmitResult result = mtir::backend::wasm::emitModule(module);
+    if (!result.diagnostics.empty())
+      std::cerr << mtir::support::format(result.diagnostics);
+    if (!result.ok())
+      return 1;
+    text = std::move(result.wat);
   } else {
     mtir::backend::llvm::EmitResult result = mtir::backend::llvm::emitModule(module);
     if (!result.ok()) {

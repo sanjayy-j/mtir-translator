@@ -123,10 +123,17 @@ add_library(mtir_llvm
   src/backend/llvm/EmitLL.cpp)
 target_link_libraries(mtir_llvm PUBLIC mtir_cir PRIVATE mtir_warnings)
 
+# The register-to-stack pass (M6a) lives here but is shared with the stack
+# bytecode back end (M7), which is why the third target costs so little.
+add_library(mtir_wasm
+  src/backend/wasm/RegToStack.cpp
+  src/backend/wasm/EmitWat.cpp)
+target_link_libraries(mtir_wasm PUBLIC mtir_cir PRIVATE mtir_warnings)
+
 # A convenience target for anything that wants the whole middle end.
 add_library(mtir_core INTERFACE)
 target_link_libraries(mtir_core INTERFACE
-  mtir_cir mtir_frontend mtir_sema mtir_cirgen mtir_opt mtir_llvm)
+  mtir_cir mtir_frontend mtir_sema mtir_cirgen mtir_opt mtir_llvm mtir_wasm)
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -151,7 +158,9 @@ if(BUILD_TESTING)
     tests/LexerTests.cpp
     tests/ParserTests.cpp
     tests/SemaTests.cpp
-    tests/BuilderTests.cpp)
+    tests/BuilderTests.cpp
+    tests/StackTests.cpp
+    tests/WasmTests.cpp)
   target_include_directories(mtir_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_link_libraries(mtir_tests PRIVATE mtir_core mtir_warnings)
   # Golden files live in the repository, so the tests need to know where that
