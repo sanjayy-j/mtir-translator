@@ -22,6 +22,34 @@ in `tests/corpus/boundary/`.
 | 8 | Address-taken locals and arrays | live in addressable memory | `alloca` in entry block; `mem2reg` promotes what it can | linear memory via a shadow stack pointer global (Wasm locals have no address) |
 | 9 | Operand evaluation order | strictly left to right | emitted in source order, no reassociation | push order fixed by the lowering |
 
+## Where each row is realised today
+
+Rows 1, 2, 3, 6 and 7 are implemented on the LLVM side in
+`include/mtir/backend/llvm/Guards.h`, one function per row, with a test per row
+in `tests/LLVMBackendTests.cpp`. Row 4 is realised by the *absence* of `nsw`
+and `nuw` on every arithmetic instruction the back end emits, which a test
+checks for explicitly. Row 5 is the type mapping in `TypeMap.h`. Row 8 is
+partly realised — the CIR builder puts mutable locals and arrays in `alloca`
+slots — and row 9 is a property of the builder's left-to-right emission order.
+Row 7 fires where the extent is recoverable from an `alloca`; global arrays
+are not lowered yet. The WebAssembly column is Member 4's and is not built.
+
+Rows 3 and 4 also constrain the compiler's *own* arithmetic, not just what it
+emits. Signed overflow, over-wide shifts and `INT_MIN / -1` are undefined
+behaviour in C++ as well as in LLVM, so `include/mtir/cir/Arith.h` is the one
+place CIR integer arithmetic is defined, and every fold runs through it in the
+unsigned domain. A compiler that defines integer semantics must not have
+undefined integer semantics itself.
+
+The optimiser respects the same table: `ConstantFoldingPass` folds a division
+only when the operands prove it cannot trap, and never folds `fdiv`, `fptosi`
+or an operand that is NaN, so no pass can delete a trap that rows 1, 2 and 6
+require. Each of those refusals has its own test.
+
+Python equivalents of the same guards remain in `src/backend/llvm/guards.py`
+and `src/opt/constfold.py` while the prototype is still the reference for the
+unmigrated parts of the pipeline.
+
 ## The asymmetry worth noticing
 
 WebAssembly's stricter, trap-based definitions mean the guard code is almost
