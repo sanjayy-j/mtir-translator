@@ -30,15 +30,20 @@ individual mark both depend on granular, attributable history.
 
 The textual `.cir` format is the contract between the middle end and every
 back end. It is specified in `docs/cir-spec.md` §§ 3–4 and changes only by
-team agreement; `tests/test_cir_parser.py` pins the round-trip property that
+team agreement; `tests/CIRTextTests.cpp` pins the round-trip property that
 makes it a contract rather than a debug dump.
 
 ## Before you push
 
 ```bash
 cmake -S . -B build && cmake --build build && ctest --test-dir build
-python -m pytest -q     # while the Python reference is still in the tree
 ```
+
+`ctest` runs the unit tests, the golden-file checks, the corpus on the stack
+VM, and -- when `llvm-as` and `wat2wasm` are installed -- the generated LLVM
+IR and WebAssembly through the real assemblers. Those two register as
+*skipped* rather than passing when the tool is missing: if you are about to
+claim the output is valid, check which of the two you actually saw.
 
 Every bug found during development becomes a permanent entry in
 `tests/corpus/` so it cannot be reintroduced.
@@ -58,21 +63,19 @@ git config user.name  "Your Name"
 git config user.email "your.regno@university.edu"
 ```
 
-Areas each member commits into. Paths marked *(not created yet)* are reserved
-by this table, not present in the tree — they appear when that member starts
-their C++ migration phase.
+Areas each member commits into.
 
 | Member | Paths |
 |---|---|
-| 1 | `include/mtir/ast/` *(not created yet)*, `src/frontend/`, `tools/mtirc/`, `docs/minilang-spec.md`, `README.md` |
-| 2 | `include/mtir/sema/` *(not created yet)*, `src/sema/`, the rule 6–8 section of `src/cir/Verifier.cpp`, `docs/divergence.md`, `tests/corpus/` |
+| 1 | `include/mtir/ast/`, `include/mtir/frontend/`, `include/mtir/tool/`, `src/frontend/`, `src/tool/`, `tools/mtirc/`, `docs/minilang-spec.md`, `README.md` |
+| 2 | `include/mtir/sema/`, `src/sema/`, the rule 6–8 section of `src/cir/Verifier.cpp`, `docs/divergence.md`, `tests/corpus/` |
 | 3 | `include/mtir/cir/`, `include/mtir/opt/`, `include/mtir/backend/llvm/` and their `src/` counterparts, `docs/cir-spec.md` |
-| 4 | `include/mtir/backend/wasm/` and `include/mtir/backend/stackvm/` *(neither created yet)* and their `src/` counterparts, `CMakeLists.txt`, `cmake/`, `.github/workflows/` |
+| 4 | `include/mtir/backend/wasm/`, `include/mtir/backend/stackvm/` and their `src/` counterparts, `CMakeLists.txt`, `cmake/`, `.github/workflows/` |
 
 `include/mtir/support/` is shared and changes by agreement, because every
 subsystem depends on `Diagnostic` and none of them owns it.
 
-The Python tree under `src/**/*.py` and `tests/test_*.py` is the behavioural
-reference for the parts of the pipeline not yet migrated to C++. Its ownership
-is the same as the C++ counterpart above, and each file is removed once its
-C++ replacement reaches test parity.
+The project is C++17 and nothing else. The Python prototype that preceded it
+has been migrated in full and removed; see `docs/migration.md` for what it
+was and what evidence was taken before deleting it. Do not add Python to the
+tree — not a script, not a test helper.

@@ -9,10 +9,10 @@
 #   bash scripts/setup.sh          # verify only
 #   bash scripts/setup.sh --build  # verify, then configure and build
 #
-# The project is C++17.  Python is still installed-and-checked because the
-# prototype in src/**/*.py is the behavioural reference for the parts of the
-# pipeline not yet migrated; it is reported as optional, not required, and
-# these checks go away with the prototype.
+# The project is C++17 and nothing else.  Everything below is either the C++
+# toolchain, which is required, or a back-end validation tool, which is not:
+# without those tools the build and the tests still run, and the checks that
+# would have used them report SKIPPED rather than passing.
 
 set -u
 
@@ -53,14 +53,11 @@ command -v llvm-as  >/dev/null 2>&1 && ok "llvm-as  $(llvm-as --version 2>/dev/n
 command -v lli      >/dev/null 2>&1 && ok "lli"                                                  || warn "lli not found      (needed to execute generated IR)"
 command -v wat2wasm >/dev/null 2>&1 && ok "wat2wasm $(wat2wasm --version 2>/dev/null)"           || warn "wat2wasm not found (WABT, needed by the Wasm back end)"
 command -v wasmtime >/dev/null 2>&1 && ok "wasmtime $(wasmtime --version 2>/dev/null)"           || warn "wasmtime not found (needed to execute generated Wasm)"
-
 echo
-echo "== Optional: the Python reference implementation =="
-if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
-  ok "python3 $(python3 --version 2>&1 | cut -d' ' -f2) -- the prototype in src/**/*.py can run"
-else
-  warn "python3 3.11+ not found -- the C++ build does not need it, but the reference suite will not run"
-fi
+echo "  Note: the stack bytecode target needs none of these.  It is built into"
+echo "  mtirc, so 'mtirc --run <file>' works on any machine that can build the"
+echo "  project -- which is why it is the one target whose behaviour the test"
+echo "  suite checks by execution rather than by inspection."
 
 echo
 echo "== Smoke test =="

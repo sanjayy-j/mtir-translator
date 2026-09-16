@@ -98,8 +98,8 @@ value, then emitting one CIR instruction with a fresh temporary:
 There is one shortcut, and it is the only one: when the operand lowers to an
 integer *literal*, the builder folds the conversion into the constant rather
 than emitting an instruction, so `let n: long = 1;` produces `1` typed `i64`
-and not `sext i64 1`. This matches what the Python prototype does today and
-keeps `--opt=0` output readable.
+and not `sext i64 1`. This is what the Python prototype did, and it keeps
+`--opt=0` output readable.
 
 If a `Conv` appears with any other from/to pair, the builder reports an
 internal error and refuses to build — it does not guess.
@@ -113,7 +113,7 @@ internal error and refuses to build — it does not guess.
    only needs to dispatch on node kind and reach children. The builder never
    mutates a node, so no non-const accessor is required.
 
-2. **The node set.** 24 kinds, being the 23 the Python AST already has plus
+2. **The node set.** 24 kinds, being the 23 the prototype's AST had plus
    `Conv`:
 
    `Program · FnDecl · GlobalDecl · Param · TypeNode · Block · Let · Assign ·
@@ -121,7 +121,7 @@ internal error and refuses to build — it does not guess.
    FloatLit · BoolLit · VarRef · Unary · Binary · Call · Index · Conv`
 
 3. **The accessors the builder reads.** These are exactly the fields the
-   Python builder touches, so the list is derived rather than wished for:
+   builder touches, so the list is derived rather than wished for:
 
    | Node | Accessors |
    |---|---|
@@ -162,9 +162,9 @@ before the builder ever sees it.
 
 ## 4. What M3 needs from M2 (`TypeInfo`)
 
-Deliberately four members. The Python builder is larger than this because M2
-did not exist and it had to re-derive types itself; **none of that logic
-should be ported.**
+Deliberately four members. The prototype's builder was larger than this
+because M2 did not exist yet and it had to re-derive types itself; none of
+that logic was ported.
 
 ```cpp
 // include/mtir/sema/TypeInfo.h                                      [M2]

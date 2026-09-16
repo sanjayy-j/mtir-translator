@@ -5,19 +5,19 @@
 Design a common intermediate representation and translate it to multiple
 execution targets while preserving semantics.
 
-Implemented in **C++17**, built with CMake. A Python prototype of the middle
-end also lives in the tree; it is the behavioural reference for the parts not
-yet migrated and is deleted subsystem by subsystem as each C++ counterpart
-reaches test parity. See [Migration status](#migration-status).
+Implemented in **C++17**, built with CMake, with no third-party
+dependencies. The project was prototyped in Python; that prototype has been
+migrated in full and removed. What it was, and what evidence was taken before
+it was deleted, is in [`docs/migration.md`](docs/migration.md).
 
 MiniLang source → **CIR** (typed, register-based three-address IR with an
 explicit CFG) → three targets:
 
 | Target | Model | Status |
 |---|---|---|
-| LLVM IR (`.ll`) | register / SSA, unstructured CFG | **built in C++** |
-| WebAssembly (`.wat` / `.wasm`) | structured stack machine, no `goto` | not started in C++ |
-| Stack bytecode (`.sbc`) + reference VM | flat stack machine, absolute jumps | not started in C++ |
+| LLVM IR (`.ll`) | register / SSA, unstructured CFG | built |
+| WebAssembly (`.wat`) | structured stack machine, no `goto` | built |
+| Stack bytecode (`.sbc`) + reference VM | flat stack machine, absolute jumps | built, and **executable** |
 
 The interesting problem is not emitting three files — it is that the targets
 **disagree about what programs mean**. WebAssembly masks over-wide shift
@@ -40,16 +40,20 @@ Requirements: a C++17 compiler and CMake 3.16 or newer. `llvm-as` is optional;
 it validates the generated LLVM IR, and without it that one test reports
 SKIPPED rather than passing.
 
-> **Verification status, stated precisely.** The C++ sources compile clean and
-> all **164 tests pass** under MSVC 19.29 at `/W4 /permissive-`, driven
-> directly by `cl`. The CMake build itself is **UNVERIFIED — CMake is not
-> installed on the machine used so far**, and the code has **not been built
-> with GCC or Clang**. `llvm-as` has **not been run locally**, so no generated
-> LLVM IR has been checked by a real assembler outside CI. Running
-> `cmake`/`ctest` once on a Linux machine is the top outstanding task.
+> **Verification status, stated precisely.** The sources compile clean and all
+> **368 tests pass** under MSVC 19.29 at `/W4 /permissive-`, driven directly
+> by `cl`. The CMake build itself is **UNVERIFIED — CMake is not installed on
+> the machine used so far**, and the code has **not been built with GCC or
+> Clang**. Neither `llvm-as` nor `wat2wasm` has been run locally, so no
+> generated LLVM IR or WebAssembly has been checked by a real assembler
+> outside CI. Running `cmake`/`ctest` once on a Linux machine is the top
+> outstanding task.
 >
 > The installed GCC is MinGW.org 6.3.0, whose libstdc++ has no `<variant>`,
 > `<optional>` or `<string_view>`, so it cannot build this project at all.
+>
+> The stack bytecode target is the exception: it needs no external tool, so
+> its behaviour *is* checked locally — see "What works today" below.
 
 ```bash
 git clone https://github.com/sanjayy-j/mtir-translator.git
@@ -61,12 +65,32 @@ ctest --test-dir build --output-on-failure
 
 ## What works today
 
+The whole pipeline, from MiniLang source to all three targets, with no
+external tool involved:
+
 ```bash
+# MiniLang -> tokens, AST, CIR
+build/mtirc --emit=tokens tests/corpus/valid/recursion.mini
+build/mtirc --emit=ast    tests/corpus/valid/recursion.mini
+build/mtirc --emit=cir    tests/corpus/valid/recursion.mini
+
+# CIR -> each of the three targets
+build/mtirc --emit=ll  docs/examples/abs.cir     # LLVM IR, with the divergence guards
+build/mtirc --emit=wat docs/examples/abs.cir     # WebAssembly text
+build/mtirc --emit=sbc docs/examples/abs.cir     # stack bytecode, addressed listing
+
+# run it on the reference stack VM
+build/mtirc --run tests/corpus/valid/recursion.mini
+# 3628800
+# 1
+
+# a trap is a defined outcome, and exits 4
+build/mtirc --run tests/cir/div_edge.cir
+# 3
+# trap: signed division overflow
+
 # CIR round-trip: parse the checked-in module and print it back unchanged
 build/mtirc --emit=cir docs/examples/abs.cir | diff - docs/examples/abs.cir && echo IDENTICAL
-
-# LLVM IR from CIR, with the divergence guards
-build/mtirc --emit=ll docs/examples/abs.cir
 
 # constant folding, copy propagation and dead-code elimination
 build/mtirc --emit=cir --opt=1 docs/examples/abs.cir
@@ -75,69 +99,59 @@ build/mtirc --emit=cir --opt=1 docs/examples/abs.cir
 build/mtirc --emit=cir --verify docs/examples/abs.cir
 ```
 
-`mtirc` does not read `.mini` yet: the C++ front end is migration phase C.
-Until it lands, MiniLang compilation runs through the Python prototype.
+A back end takes `.cir` as readily as `.mini`, which is the point of having a
+textual IR: each one can be developed and tested with no front end involved.
 
-Stages that are not migrated yet exit with status 3 and name the module, its
-owner and the migration phase they are scheduled for, so the state of the
-project is readable from the tool itself:
+### What is actually executed, and what is only inspected
 
-```bash
-$ build/mtirc --emit=wat docs/examples/abs.cir
-error: --emit=wat is not implemented yet.
-       WebAssembly back end (M6c) is owned by Member 4 and is scheduled for migration phase H.
-       Implemented today: --emit=cir, --emit=ll.
-```
+This distinction is worth being blunt about, because two of the three targets
+cannot be run on the development machine at all.
 
-## Migration status
+| Target | Checked how |
+|---|---|
+| Stack bytecode | **Executed.** Every corpus program runs on the VM and its output is compared against what the source says it should print (`cmake/RunCorpusCheck.cmake`). |
+| LLVM IR | Structurally, plus `llvm-as` in CI (`cmake/LlvmAsCheck.cmake`). Never executed. |
+| WebAssembly | Structurally, plus `wat2wasm` and `wasm-validate` in CI (`cmake/Wat2WasmCheck.cmake`). Never executed. |
 
-The project was prototyped in Python and is being migrated to C++17. Nothing
-in this table is a projection — it is what the two trees contain today.
+Both external-tool checks register as **skipped**, never as passed, when the
+tool is absent, so a run that validated nothing cannot be mistaken for one
+that did.
 
-| Component | C++ | Python prototype |
-|---|---|---|
-| CIR types, values, opcodes, instructions | ✅ `include/mtir/cir/` | still present |
-| CFG construction and queries | ✅ `CFG.h` | still present |
-| CIR verifier, 8 well-formedness rules | ✅ `Verifier.h` | never implemented |
-| CIR printer | ✅ byte-identical to `abs.cir` | still present |
-| CIR parser, round-trip | ✅ `Parser.h` | still present |
-| Optimiser: fold / copyprop / DCE | ✅ `include/mtir/opt/` | still present |
-| LLVM back end + trap guards | ✅ byte-identical to the Python output | still present |
-| CLI | ✅ `mtirc`, `.cir` input | `python -m src.driver`, `.mini` and `.cir` |
-| Lexer, parser, AST | ❌ not started | ✅ working |
-| CIR builder, AST → CIR | ❌ blocked on the C++ AST | ✅ working |
-| Symbol table, type checker | ❌ not started | ❌ never implemented |
-| Reg-to-stack, WebAssembly, stack VM | ❌ not started | prototype / stubs |
-| Differential harness | ❌ not started | ❌ never implemented |
+Because the VM runs, `docs/divergence.md` rows 1 to 7 are *observed* rather
+than asserted: division by zero traps, `INT_MIN / -1` traps, `1 << 32` is `1`,
+signed overflow wraps, a comparison yields 0 or 1, converting NaN traps, and a
+load outside linear memory traps. `tests/StackVMTests.cpp` names the row each
+test covers.
 
-The Python tree is retained deliberately: it is the behavioural reference for
-everything not yet migrated, and it is removed subsystem by subsystem as each
-C++ counterpart reaches test parity. It is **not** the implementation.
+## Implementation status
 
-```bash
-python -m pytest -q     # the reference suite: 329 pass, 7 skip without llvm-as
-```
-
-Ownership and the C++ status of each module:
-
-| Component | Module | Owner | C++ status |
+| Component | Module | Owner | Status |
 |---|---|---|---|
-| CIR data model | M3a | M3 | ✅ complete |
-| CFG + queries | M3a | M3 | ✅ complete |
-| CIR verifier, rules 1–8 | M3b | M3 (M2 to review 6–8) | ✅ complete |
-| CIR printer | M3c | M3 | ✅ complete |
-| CIR text parser | M3c | M3 | ✅ complete |
-| Optimiser | M4 | M3 | ✅ three passes, to a fixed point |
-| LLVM back end + guards | M5 | M3 | ✅ every opcode in cir-spec § 3 |
-| CLI (`mtirc`) | M9 | M1 | ✅ `.cir` input; `.mini` needs phase C |
-| CMake build + CTest | M8b | M4 | ✅ libraries, CLI, tests |
-| Lexer, parser, AST | M1 | M1 | ❌ migration phase C |
-| CIR builder (AST → CIR) | M3a | M3 | ❌ blocked on the C++ AST |
-| Symbol table + type checker | M2 | M2 | ❌ migration phase D |
-| Reg-to-stack, CFG structuring | M6a/M6b | M4 | ❌ migration phase H |
-| WebAssembly back end | M6c | M4 | ❌ migration phase H |
-| Stack bytecode + VM | M7 | M4 | ❌ migration phase H |
-| CIR interpreter + differential harness | M8 | M2/M4 | ❌ migration phase I |
+| Lexer, parser, AST | M1 | M1 | complete |
+| Symbol table + type checker | M2 | M2 | complete |
+| CIR data model, CFG + queries | M3a | M3 | complete |
+| CIR verifier, rules 1–8 | M3b | M3 | complete |
+| CIR printer and text parser | M3c | M3 | complete |
+| CIR builder (AST → CIR) | M3a | M3 | complete |
+| Optimiser: fold / copyprop / DCE | M4 | M3 | complete, to a fixed point |
+| LLVM back end + trap guards | M5 | M3 | complete |
+| Register-to-stack lowering | M6a | M4 | complete |
+| CFG structuring for WebAssembly | M6b | M4 | dispatch tower; a Relooper is future work |
+| WebAssembly back end | M6c | M4 | complete |
+| Stack bytecode back end + VM | M7 | M4 | complete |
+| CLI (`mtirc`) | M9 | M1 | complete |
+| CMake build + CTest | M8b | M4 | complete, but never configured locally |
+| CIR reference interpreter | M8a | M2 | **not built** |
+| Four-way differential harness | M8b | M4 | **not built** |
+| Random program generator | M8b | M4 | **not built** |
+
+The three unbuilt modules were never built in either language; they are
+described, with their owners, in [`docs/migration.md`](docs/migration.md).
+
+The WebAssembly back end uses a dispatch tower rather than a Relooper-style
+structural analysis. That is correct for **any** CFG, including one the
+optimiser has rewritten, and it is deliberately not the prettiest possible
+output; `include/mtir/backend/wasm/EmitWat.h` explains the trade-off.
 
 ## The worked example
 
@@ -163,37 +177,43 @@ line. Regenerate it with:
 build/mtirc --emit=ll docs/examples/abs.cir > docs/examples/abs.gen.ll
 ```
 
-The C++ and Python back ends emit **byte-identical** text for this input, which
-is how the migration is checked: `abs.gen.ll` is a golden file for both.
+`abs.gen.ll` was byte-identical between the C++ and the Python back ends
+throughout the migration, which is how the migration was checked; see
+[`docs/migration.md`](docs/migration.md) for the parity evidence and for the
+one place the two implementations deliberately disagreed.
 
 Note the difference between `abs.ll` and `abs.wat`: LLVM keeps the two-branch
-CFG exactly as CIR expresses it, while WebAssembly must re-express it as a
-structured `if/else` leaving its result on the operand stack. That is module
-M6b, and it is why the two back ends are not simply two printers over the same
-data.
+CFG exactly as CIR expresses it, while WebAssembly must re-express it as
+structured regions. That is module M6b, and it is why the two back ends are
+not simply two printers over the same data. `abs.wat` is the hand-written
+structured form a Relooper would produce; what the back end emits today is a
+dispatch tower, which is correct for any CFG but less pretty.
 
 ## Repository layout
 
 ```text
 CMakeLists.txt      C++17 build: libraries, mtirc, CTest
-cmake/              golden-file and llvm-as check scripts
+cmake/              golden-file, llvm-as, wat2wasm and corpus-run checks
 include/mtir/
   support/          SourceLoc, Diagnostic                          [shared]
   cir/              Type, Arith, Value, Opcode, Instruction,
                     Function, Module, CFG, Verifier,
                     Printer, Parser                                [M3]
   opt/              Pass, PassManager, ConstFold/CopyProp/DCE      [M3]
+  ast/, frontend/   Token, AST, Lexer, Parser                      [M1]
+  sema/             TypeInfo, Analyse                              [M2]
   backend/llvm/     TypeMap, Emitter, Guards, EmitLL               [M3]
+  backend/wasm/     RegToStack, EmitWat                            [M4]
+  backend/stackvm/  EmitSbc, VM                                    [M4]
+  tool/             Driver -- the CLI, as a callable function      [M1]
 src/                the .cpp files, mirroring include/mtir/
-tools/mtirc/        the command-line driver                        [M1]
-tests/              C++ unit tests and the golden fixtures         [M3, M4]
-tests/cir/          CIR lowered from the corpus by the Python reference,
-                    so the C++ side has real programs to test against
-                    before the C++ front end exists                    [M3]
-docs/               language spec, CIR spec, divergence table, examples
-
-src/**/*.py         the Python prototype -- reference only, removed
-tests/test_*.py     subsystem by subsystem as C++ reaches parity
+tools/mtirc/        the process entry point, a wrapper over Driver [M1]
+tests/              C++ unit tests and the golden fixtures
+tests/cir/          checked-in CIR programs, so every back end can be
+                    tested with no front end involved                  [M3]
+tests/corpus/       MiniLang sources: valid/ and invalid/              [M1]
+docs/               language spec, CIR spec, divergence table,
+                    migration record, worked example
 ```
 
 The library targets enforce the dependency graph at link time. The invariant
@@ -207,7 +227,10 @@ built and tested against checked-in `.cir` files with no front end involved.
 - [`docs/cir-spec.md`](docs/cir-spec.md) — CIR design and well-formedness rules
 - [`docs/divergence.md`](docs/divergence.md) — cross-target semantic divergences
 - [`docs/frontend-cir-contract.md`](docs/frontend-cir-contract.md) — the M1 → M2 → M3
-  interface the CIR builder will be written against
+  interface the CIR builder is written against
+- [`docs/migration.md`](docs/migration.md) — what the Python prototype was,
+  what replaced it, and the parity evidence taken before it was deleted
+- [`docs/decisions/`](docs/decisions/) — decision records
 - [`docs/decisions/`](docs/decisions/) — open questions needing a team decision
 - [`tests/cir/README.md`](tests/cir/README.md) — the generated CIR fixtures and why they exist
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — branch, review and commit conventions

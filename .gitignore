@@ -16,15 +16,6 @@ compile_commands.json
 Testing/
 .cache/
 
-# Python reference implementation (removed with the prototype)
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.coverage
-htmlcov/
-.venv/
-venv/
-
 # Generated compiler output
 *.ll
 *.bc

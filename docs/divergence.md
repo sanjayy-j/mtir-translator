@@ -46,9 +46,13 @@ only when the operands prove it cannot trap, and never folds `fdiv`, `fptosi`
 or an operand that is NaN, so no pass can delete a trap that rows 1, 2 and 6
 require. Each of those refusals has its own test.
 
-Python equivalents of the same guards remain in `src/backend/llvm/guards.py`
-and `src/opt/constfold.py` while the prototype is still the reference for the
-unmigrated parts of the pipeline.
+Rows 1 to 7 are not only asserted here: the reference stack VM executes them,
+and `tests/StackVMTests.cpp` names the row each test covers. That is the only
+target that can be run on the development machine, so it is the only place
+this table is currently checked by execution rather than by inspection —
+`llvm-as`, `lli`, `wat2wasm` and `wasmtime` are all absent there. The
+four-way differential harness that would compare all three targets against a
+CIR interpreter (M8a/M8b) is **not built**; see `docs/migration.md`.
 
 ## The asymmetry worth noticing
 

@@ -6,74 +6,60 @@ on:
   pull_request:
     branches: [main]
 
+# The implementation is C++17 and nothing else.  There is no Python job: the
+# prototype it used to run against has been migrated in full and removed from
+# the repository.  See docs/migration.md.
+
 jobs:
-  # ---------------------------------------------------------------------
-  # The C++17 implementation.  This is the job that matters: C++ is the
-  # project's implementation language, and the Python job below runs only
-  # while the prototype is still the reference for the parts of the
-  # pipeline that have not been migrated yet (front end, semantic
-  # analysis, WebAssembly and stack back ends).
-  # ---------------------------------------------------------------------
-  cpp:
-    name: Build and test the C++ implementation
-    runs-on: ubuntu-latest
+  build:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM tools
+      # LLVM gives llvm-as; WABT gives wat2wasm and wasm-validate.  Both are
+      # optional: CMake registers the corresponding tests as skipped when the
+      # tool is missing, so the Windows job still builds and runs everything
+      # that does not need them.
+      - name: Install LLVM and WABT
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y llvm
+          sudo apt-get install -y llvm wabt
 
       - name: Configure
-        # No -DMTIR_WERROR=ON yet: the code has been compiled clean with
-        # MSVC at /W4 but has not been built with GCC, so the first CI run
-        # is expected to surface warnings that nobody has triaged.
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build --config Release --parallel
 
-      # Runs the unit tests, the two golden-file checks through mtirc, and
-      # llvm-as over the generated IR.  The llvm-as test reports SKIPPED
-      # rather than passing when the tool is absent, so a run that validated
-      # nothing cannot be mistaken for one that did.
+      # Runs, in one go:
+      #   - the C++ unit tests
+      #   - the two golden-file checks through mtirc
+      #   - llvm-as over the generated LLVM IR
+      #   - wat2wasm and wasm-validate over the generated WebAssembly
+      #   - every corpus program executed on the reference stack VM, with its
+      #     output compared against what the source says it should print
+      #
+      # The two external-tool checks report SKIPPED rather than passing when
+      # the tool is absent, so a run that validated nothing cannot be mistaken
+      # for one that did.
       - name: Test
-        run: ctest --test-dir build --output-on-failure
-
-  test:
-    name: Python reference implementation (retired at migration phase K)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dev dependencies
-        run: python -m pip install -r requirements.txt
-
-      # The same script every member runs locally, so local and CI
-      # environments cannot silently diverge.
-      - name: Verify environment
-        run: bash scripts/setup.sh
-
-      - name: Run tests
-        run: python -m pytest -q --cov=src --cov-report=term-missing
-
-      # Golden-file check: the CIR printer must stay byte-identical to the
-      # worked example in the Review 1 report.
-      - name: CIR printer golden file
-        run: python -m src.driver --demo-cir | diff - docs/examples/abs.cir
+        run: ctest --test-dir build --build-config Release --output-on-failure
 
   validate-examples:
-    name: Validate hand-written target files
+    name: Validate the hand-written target files
     runs-on: ubuntu-latest
 
+    # These are the reference artefacts in docs/examples, written by hand to
+    # show what each back end is aiming at.  They are checked separately from
+    # the generated ones so that a regression in the compiler and a mistake in
+    # the documentation cannot be confused for one another.
     steps:
       - uses: actions/checkout@v4
 

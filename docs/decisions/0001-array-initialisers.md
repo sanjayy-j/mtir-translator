@@ -42,12 +42,16 @@ semantically valid, and the file is correctly placed for the assertion that is
 actually made about it. The file has been unchanged since the initial scaffold
 commit `3027aef`, i.e. it predates every implementation.
 
-**Current behaviour.** The Python reference refuses to lower it:
+**Current behaviour.** The compiler refuses to lower it:
 
 ```
 tests/corpus/valid/arrays.mini:5:5: error[E004]: an array declaration cannot
-take an initialiser (array initialisers need M2's E004 check first)
+take an initialiser; see docs/decisions/0001-array-initialisers.md
 ```
+
+The Python prototype refused it too, with the same code at the same position;
+its message pointed at another member's unfinished work rather than at this
+record.
 
 That refusal was a placeholder chosen so the builder would not invent
 semantics — it is *not* a decision, and it is why `arrays.mini` is the one

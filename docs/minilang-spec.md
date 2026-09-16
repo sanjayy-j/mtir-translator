@@ -59,7 +59,7 @@ primary     ::= INT_LIT | FLOAT_LIT | 'true' | 'false'
 
 All binary operators are left-associative. The implementation collapses the
 `orExpr … mulExpr` cascade into a single precedence-climbing routine driven by
-the `BINARY_PREC` table in `src/frontend/parser.py`; the cascade above is the
+the precedence table in `src/frontend/Parser.cpp`; the cascade above is the
 normative definition.
 
 Every branch body is a braced block, so there is no dangling-else ambiguity

@@ -1,8 +1,7 @@
-# Generated CIR fixtures
+# Checked-in CIR fixtures
 
-These `.cir` files are **generated artefacts**, not hand-written sources. Each
-one is the CIR that the Python reference implementation lowers from the
-MiniLang program of the same name:
+These `.cir` files are **checked-in artefacts**, not hand-written sources.
+Each one is the CIR lowered from the MiniLang program of the same name:
 
 | Fixture | Source program |
 |---|---|
@@ -15,23 +14,27 @@ MiniLang program of the same name:
 
 ## Why they exist
 
-The C++ CIR core, optimiser and LLVM back end are migrated; the C++ front end
-is not. Without these fixtures the C++ tests can only exercise hand-written
-snippets, which are short, regular, and chosen by the same person who wrote
-the code under test. These give the C++ side **real programs** — loops,
-nested branches, recursion, mutual recursion, globals, and the three
-`docs/divergence.md` boundary cases — before the C++ front end exists.
+They were introduced while the C++ front end did not yet exist, so that the
+C++ CIR core, optimiser and back ends could be tested against **real
+programs** — loops, nested branches, recursion, globals, and the three
+`docs/divergence.md` boundary cases — rather than against hand-written
+snippets chosen by the same person who wrote the code under test.
 
-They are a migration scaffold. Once the C++ front end and CIR builder land,
-these tests should be re-pointed at CIR built by the C++ builder, and this
-directory removed along with the Python prototype.
+The front end exists now, and the fixtures have outlived that original
+purpose. They are kept for a better one: a back end can be developed and
+tested with no front end in the picture at all, which is precisely the
+property the textual `.cir` format was introduced to provide
+(`docs/cir-spec.md` § 1). Deleting them would quietly make every back-end
+test depend on the front end being correct.
 
-**Having these does not mean the front end is migrated.** It is not.
+They also pin the front end: `tests/CorpusTests.cpp` checks that lowering the
+`.mini` source still produces the CIR recorded here, so a change in the
+builder cannot slip through unnoticed.
 
 ## Regenerating
 
 ```bash
-python -m src.driver --emit=cir tests/corpus/valid/arith.mini > tests/cir/arith.cir
+build/mtirc --emit=cir tests/corpus/valid/arith.mini > tests/cir/arith.cir
 # ...and so on for each row of the table above
 ```
 
@@ -41,14 +44,20 @@ run, which is what makes them usable as checked-in fixtures.
 Note that the `.cir` format has no comment syntax, so the provenance of each
 file is recorded here rather than in a header inside it.
 
-## What the C++ tests do with them
+## What the tests do with them
 
-`tests/CorpusTests.cpp` runs each fixture through parse → verify →
-print → re-parse → optimise → re-verify → LLVM emission, and checks that the
+`tests/CorpusTests.cpp` runs each fixture through parse → verify → print →
+re-parse → optimise → re-verify → LLVM emission, and checks that the
 optimiser neither breaks well-formedness nor removes a trap.
+
+`tests/WasmTests.cpp` lowers each to WebAssembly and checks the result is
+structurally sound. `tests/StackVMTests.cpp` **runs** each on the reference
+stack VM and compares what it printed against what the MiniLang source says
+it should print — twice, unoptimised and at `-O1`, requiring the same answer
+both times.
 
 ## Not included
 
-`tests/corpus/valid/arrays.mini` has no fixture. The Python reference refuses
-to lower it because `let xs: int[8] = 0;` has no defined semantics in
-`docs/minilang-spec.md`. See `docs/decisions/0001-array-initialisers.md`.
+`tests/corpus/valid/arrays.mini` has no fixture: `let xs: int[8] = 0;` has no
+defined semantics in `docs/minilang-spec.md`, so the compiler refuses to lower
+it. See `docs/decisions/0001-array-initialisers.md`.

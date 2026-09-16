@@ -10,7 +10,7 @@ Module M3 · Owner: Member 3 · Status: v1 complete; § 7 lists what is built
 | Typed on every instruction | No back end ever infers a type. The WebAssembly emitter reads the width off the instruction rather than deducing it, and the verifier can catch front-end bugs before they reach any emitter. |
 | **Not** in SSA form | Dominance frontiers and φ-placement are a project in themselves. Mutable locals become `alloca`/`load`/`store`; LLVM's `mem2reg` recovers SSA downstream, and WebAssembly locals map straight onto CIR locals. SSA is a Review 3 extension. |
 | Explicit CFG, one terminator per block | The shared structure that the LLVM back end consumes directly and the WebAssembly back end must restructure. |
-| Textual `.cir` interchange format | Back ends consume text, not Python objects, so they can be developed against checked-in `.cir` files without the front end being finished. |
+| Textual `.cir` interchange format | Back ends consume text, not in-memory objects, so they can be developed and tested against checked-in `.cir` files with no front end involved. |
 
 ## 2. Types
 
@@ -96,8 +96,12 @@ if (c) A else B          while (c) B              for (i; c; s) B
 
 `break` branches to the exit block, `continue` to the step block (`for`) or
 the head block (`while`). Because these are the only control constructs in
-MiniLang, every CFG the builder produces is reducible — which is what makes
-the WebAssembly fallback path in `structurer.py` viable.
+MiniLang, every CFG the builder produces is reducible — which is what would
+make a Relooper-style structuring pass viable for the WebAssembly back end.
+That back end does not rely on it: it emits a dispatch tower, which is
+correct for any CFG, reducible or not, and so keeps working after the
+optimiser has rewritten the block structure. See
+`include/mtir/backend/wasm/EmitWat.h`.
 
 ## 6. Well-formedness
 
@@ -139,23 +143,24 @@ are not touched here.
 
 ## 7. What is built
 
-The implementation language is C++17. A Python prototype of the same design
-is still in the tree as a behavioural reference and is removed subsystem by
-subsystem as each C++ counterpart reaches test parity.
+The implementation language is C++17. Every piece below is implemented and
+tested; the Python prototype this design was first written in has been
+migrated in full and removed (see `docs/migration.md`).
 
-| Piece | C++ | Python prototype |
-|---|---|---|
-| Types, arithmetic semantics | `include/mtir/cir/Type.h`, `Arith.h` | `src/cir/ir.py` |
-| Values, opcodes, instructions | `Value.h`, `Opcode.h`, `Instruction.h` | `src/cir/ir.py` |
-| Blocks, functions, modules | `Function.h`, `Module.h` | `src/cir/ir.py` |
-| CFG queries | `CFG.h` | `src/cir/cfg.py` |
-| Verifier, rules 1–8 | `Verifier.h` | rules 1–5 only, in `cfg.py` |
-| Printer (Module → text) | `Printer.h` | `src/cir/printer.py` |
-| Parser (text → Module) | `Parser.h` | `src/cir/parser.py` |
-| Builder (AST → Module) | not started — needs the C++ AST | `src/cir/builder.py` |
-| Reference interpreter | not started | never implemented |
+| Piece | Where |
+|---|---|
+| Types, arithmetic semantics | `include/mtir/cir/Type.h`, `Arith.h` |
+| Values, opcodes, instructions | `Value.h`, `Opcode.h`, `Instruction.h` |
+| Blocks, functions, modules | `Function.h`, `Module.h` |
+| CFG queries | `CFG.h` |
+| Verifier, rules 1–8 | `Verifier.h` |
+| Printer (Module → text) | `Printer.h` |
+| Parser (text → Module) | `Parser.h` |
+| Builder (AST → Module) | `Builder.h` |
+| Reference interpreter (M8a) | **not built** — see `docs/migration.md` |
 
 Two C++ design points worth recording, because both are places where a
+mechanical translation of the prototype would have been wrongTwo C++ design points worth recording, because both are places where a
 mechanical translation of the prototype would have been wrong:
 
 - **`Arith.h` is the single definition of CIR integer arithmetic.** Signed
