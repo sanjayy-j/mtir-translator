@@ -230,7 +230,7 @@ $BrokenCir  = Join-Path $DemoDir 'examples\broken.cir'
 # Stages
 # ---------------------------------------------------------------------------
 function Stage-Front {
-    Write-Section '1' 'Front end: MiniLang -> tokens -> AST' `
+    Write-Section '3a' 'Front end: MiniLang -> tokens -> AST' `
         'The C++ lexer and parser.  Semantic analysis runs next and is what types the AST.'
     Write-Note "source: docs\examples\abs.mini"
     Write-Host ''
@@ -242,7 +242,7 @@ function Stage-Front {
 }
 
 function Stage-Cir {
-    Write-Section '2' 'Middle end: MiniLang -> CIR' `
+    Write-Section '3b' 'Middle end: MiniLang -> CIR' `
         'Typed, register-based, three-address, explicit CFG -- and deliberately not SSA.'
     [void](Invoke-Mtirc -MtircArgs @('--emit=cir', $AbsMini) -SaveAs 'abs.cir')
     Compare-Expected -Generated 'abs.cir' -ExpectedName 'abs.cir'
@@ -265,7 +265,7 @@ function Stage-Cir {
 }
 
 function Stage-Verify {
-    Write-Section '3' 'CIR verifier: eight well-formedness rules' `
+    Write-Section '4' 'CIR verifier: eight well-formedness rules' `
         'Objective O1 -- malformed IR is detected and named, not passed to a back end.'
     Write-Note 'A well-formed module verifies silently and exits 0:'
     [void](Invoke-Mtirc -MtircArgs @('--verify', '--emit=cir', $AbsCir) -Quiet)
@@ -279,7 +279,7 @@ function Stage-Verify {
 }
 
 function Stage-Opt {
-    Write-Section '4' 'Optimiser: constant folding, copy propagation, DCE' `
+    Write-Section '8' 'Optimiser: constant folding, copy propagation, DCE' `
         'Run to a fixed point over CIR -- once, for all three targets.'
     Write-Note 'source: tests\corpus\valid\arith.mini'
     Write-Host ''
@@ -366,7 +366,7 @@ function Stage-Stack {
 }
 
 function Stage-Tests {
-    Write-Section '8' 'Tests' 'The project suite, run live. Nothing here is a canned number.'
+    Write-Section '9' 'Tests' 'The project suite, run live. Nothing here is a canned number.'
 
     $testsExe = Join-Path $Root 'build\mtir_tests.exe'
     if (Test-Path $testsExe) {
@@ -406,7 +406,7 @@ function Stage-Tests {
 }
 
 function Stage-Status {
-    Write-Section '0' 'What can and cannot be executed on this machine' `
+    Write-Section '2' 'What can and cannot be executed on this machine' `
         'Stated up front so nothing in the demo is mistaken for more than it is.'
 
     $tools = @(
@@ -462,10 +462,10 @@ switch ($Stage) {
         Stage-Front
         Stage-Cir
         Stage-Verify
-        Stage-Opt
         Stage-Llvm
         Stage-Wasm
         Stage-Stack
+        Stage-Opt
         Stage-Tests
     }
 }
