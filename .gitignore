@@ -16,6 +16,10 @@ compile_commands.json
 Testing/
 .cache/
 
+# Demo output.  The runner regenerates everything under demo/out/ on each
+# run; demo/expected/ holds the checked-in reference copies.
+demo/out/
+
 # Generated compiler output
 *.ll
 *.bc
@@ -23,6 +27,14 @@ Testing/
 *.wasm
 *.sbc
 out/
+
+# ...except the reference artefacts, which are checked in on purpose.  The
+# patterns above exist to stop stray build output being committed, and these
+# files would otherwise be caught by them and silently fail to stage.
+!docs/examples/*.ll
+!docs/examples/*.wat
+!demo/expected/*.ll
+!demo/expected/*.wat
 
 # Keep the hand-written worked examples, which are checked-in evidence
 !docs/examples/*.ll
