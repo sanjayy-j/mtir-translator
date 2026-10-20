@@ -90,6 +90,12 @@ else must be written out. The parser never infers a type — `Expr.ty` is
 - `for` clauses are all optional; `for (;;)` is an infinite loop.
 - Declarations are scoped to the enclosing block; shadowing an outer name is
   permitted, re-declaring in the same scope is not.
+- An array declaration takes no initialiser: `let xs: int[8];` is legal,
+  `let xs: int[8] = 0;` is E004. Array elements start undefined and must be
+  assigned before they are read. (Decision 0001, 20 Oct 2026.)
+- Reading a local variable or array element before it has been assigned is
+  undefined behaviour: targets may differ, and the differential harness does
+  not compare such programs.
 
 ## 6. Arithmetic semantics
 

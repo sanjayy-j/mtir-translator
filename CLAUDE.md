@@ -51,13 +51,14 @@ Expected `--run` output:
 | `recursion` | 3628800, 1 |
 | `nesting` | 3 |
 | `shift_edge` | 1, -2147483648, 1, 2 |
+| `arrays` | 107.000000, 140 |
 | `div_edge` | 3, then a trap (exit 4) |
 | `docs/examples/abs` | 7 |
 
 ## Known open items
 
-- `tests/corpus/valid/arrays.mini` is rejected with **E004**. The builder refuses `let xs: int[8] = 0;` pending a team decision in `docs/decisions/0001-array-initialisers.md`. Don't choose a semantics unilaterally.
-- Open questions for the team, logged in `status.md`: should an int literal that doesn't fit in `int` (e.g. `4294967296` in an int context, which silently becomes 0) be an error? And what does reading an uninitialised variable give? (LLVM and Wasm return stale memory; the interpreter returns 0.)
+- Decision 0001 is settled (20 Oct 2026, option A): array declarations take no initialiser (E004), and reading anything unassigned is undefined. `arrays.mini` was edited to match. The C++ tests that expect `arrays.mini` to be rejected (`tests/SemaTests.cpp`, `tests/DriverTests.cpp`) still need a new invalid example on `origin/main`; that's Sanjay's tree.
+- Open question for the team, logged in `status.md`: should an int literal that doesn't fit in `int` (e.g. `4294967296` in an int context, which silently becomes 0) be an error?
 - Fixed since Review 2 (details in `status.md`): the bytecode emitter and VM now agree (defect #1); the Wasm back end validates, runs and is structured (`structurer.py`); the differential harness and random generator exist (507/507 four-way agreement at `--opt 0` and `--opt 1`); `symtab.py` and `diagnostics.py` are implemented and `typecheck.py` reports E001–E012.
 - How the harness runs each target: LLVM through `clang` (`lli` isn't installed), Wasm through the `wasmtime` pip package. Tests skip a target whose tool is missing.
 

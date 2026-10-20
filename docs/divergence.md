@@ -83,8 +83,8 @@ agreement, with every remaining disagreement recorded here with its cause and
 either a fix or a documented reason it cannot be guarded.
 
 **Current result (20 Oct 2026): 507/507 programs agree on interp, LLVM, Wasm
-and VM, at both `--opt 0` and `--opt 1`** (the corpus minus `arrays.mini`,
-plus 500 random seeds). With `--opt 1` the harness also checks the optimised
+and VM, at both `--opt 0` and `--opt 1`** (the whole corpus,
+plus 500 random seeds; `arrays.mini` joined after decision 0001). With `--opt 1` the harness also checks the optimised
 program against the unoptimised one.
 
 | Date | Program | Targets disagreeing | Cause | Resolution |
@@ -95,11 +95,14 @@ program against the unoptimised one.
 | 20 Oct 2026 | random seeds 122, 475 | `--opt 1` vs `--opt 0` | the constant folder used unwrapped operands, so it folded a division by an i32 `4294967296`; folded `true` was -1 | folder wraps operands first; `i1` results stay 0/1 |
 | 20 Oct 2026 | Wasm `true` globals | Wasm | `wrap_int(1, i1) == -1`, so `true` was stored as -1 and `!flag` was non-zero | `i1` constants emitted as 0/1 (row 5) |
 
-### Not guarded, by design (needs a spec decision)
+### Not guarded, by design
 
-- **Reading an uninitialised local or array element.** LLVM and Wasm read
-  stale stack memory; the interpreter reads 0. The spec doesn't define it (see
-  docs/decisions/0001), and the generator never produces it.
+- **Reading an uninitialised local or array element** is undefined behaviour
+  (minilang-spec.md §5, decided 20 Oct 2026). LLVM and Wasm read stale stack
+  memory; the interpreter reads 0. The generator never produces it.
+
+### Needs a spec decision
+
 - **An int literal out of range for `int`.** Accepted, and wrapped (so
   `4294967296` is 0 in an int context), consistently on every target now.
   Whether it should be a compile-time error is open.

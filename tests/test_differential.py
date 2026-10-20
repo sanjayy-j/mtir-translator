@@ -12,15 +12,13 @@ import pytest
 from tests.harness.differential import corpus_paths, run_all
 from tests.harness.gen_random import generate
 
-ARRAYS = "arrays.mini"     # rejected pending docs/decisions/0001
-
 
 def check(outcome):
     assert outcome.error is None, outcome.error
     assert outcome.agrees, {t: r for t, r in outcome.results.items()}
 
 
-@pytest.mark.parametrize("path", [p for p in corpus_paths() if not p.endswith(ARRAYS)],
+@pytest.mark.parametrize("path", corpus_paths(),
                          ids=lambda p: Path(p).name)
 @pytest.mark.parametrize("opt", [0, 1])
 def test_corpus(path, opt):

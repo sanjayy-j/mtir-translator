@@ -19,6 +19,7 @@ def chk(body, extra=""):
     ("E003", "let l: long = 1; let f: float = 1.0; let y: float = l * f;", ""),
     ("E003", "if (1) { }", ""),
     ("E004", "let b: bool = 1;", ""),
+    ("E004", "let xs: int[8] = 0;", ""),        # decision 0001, option A
     ("E005", "let l: long = 1; let x: int = l;", ""),
     ("E005", "let f: float = 1.0; let x: int = f;", ""),
     ("E006", "nope();", ""),

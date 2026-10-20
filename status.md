@@ -84,9 +84,14 @@ Legend: ☐ open · ◐ in progress · ☑ done · ⛔ blocked on a team decisio
 - [x] They now use `llvm-as` if it's installed, otherwise Apple `clang -x ir`.
       All 66 LLVM tests run; 0 skipped.
 
-### 9. ⛔ `arrays.mini` rejected with E004
-- Needs the team decision in docs/decisions/0001-array-initialisers.md.
-  Not changed. (The doc recommends Option A: forbid the initialiser.)
+### 9. ☑ `arrays.mini` rejected with E004
+- Decided 20 Oct 2026 by Krishita (M1): **option A**, so array declarations
+  take no initialiser (E004), and reading anything unassigned is undefined.
+  Spec §5, type checker, decision 0001 and `arrays.mini` updated. It now runs
+  (`107.000000`, `140`) and agrees on all four targets.
+- Still to do on `origin/main` (C++, Sanjay): `tests/SemaTests.cpp` and
+  `tests/DriverTests.cpp` use `arrays.mini` as the rejected example and need
+  a new invalid file.
 
 ### 10. ☑ Docs
 - [x] CLAUDE.md: branch state, setup (`wasmtime`), harness command, known
@@ -134,8 +139,7 @@ Legend: ☐ open · ◐ in progress · ☑ done · ⛔ blocked on a team decisio
 
 ## Remaining
 
-- **9** is blocked on the team's array-initialiser decision
-  (docs/decisions/0001). Everything else is done.
+- All 10 subtasks are done. Team to confirm decision 0001.
 - The push of `python-combined` got a 403; waiting for collaborator access
   from Sanjay.
 - 20 Oct 2026: **10 done** (not committed): CLAUDE.md, docs/divergence.md.

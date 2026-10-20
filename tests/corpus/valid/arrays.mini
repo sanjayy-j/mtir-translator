@@ -2,7 +2,7 @@
 global counter: int = 0;
 
 fn sum(n: int) -> int {
-    let xs: int[8] = 0;
+    let xs: int[8];
     let i: int = 0;
     while (i < n) {
         xs[i] = i * i;

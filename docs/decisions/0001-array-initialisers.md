@@ -1,6 +1,8 @@
 # Decision needed: what does `let xs: int[8] = 0;` mean?
 
-**Status:** OPEN — needs a team decision before M2 writes the type checker.
+**Status:** DECIDED, 20 Oct 2026: **Option A** (forbid the initialiser).
+Decided by Krishita Gupta (M1, owner of `minilang-spec.md`); to be confirmed
+by the team.
 **Raised by:** Member 3, during the C++ migration audit.
 **Affects:** M1 (grammar/spec), M2 (type checker), M3 (CIR builder), M4 (corpus).
 
@@ -106,8 +108,20 @@ it.
 **Whoever owns the decision:** M1 owns `minilang-spec.md`; M2 owns the type
 checker and `tests/corpus/`. M3 will follow whatever is written down.
 
-## What has *not* been done
+## Outcome (20 Oct 2026, Python implementation on `python-combined`)
 
-`tests/corpus/valid/arrays.mini` has **not** been modified. No semantics have
-been invented in either implementation. This note records the finding and the
-options only.
+- `minilang-spec.md` §5: an array declaration takes no initialiser (E004);
+  elements start undefined and must be assigned before they are read. Reading
+  any unassigned local or element is undefined behaviour (decided at the same
+  time).
+- `src/sema/typecheck.py` reports E004; the builder's existing E004 refusal
+  now cites the spec instead of calling itself a placeholder.
+- `tests/corpus/valid/arrays.mini`: `let xs: int[8] = 0;` became
+  `let xs: int[8];`. It now runs (`107.000000`, `140`) and agrees on all four
+  targets.
+
+**Not yet updated:** the C++ tree. `tests/SemaTests.cpp` ("arrays.mini is
+rejected for its array initialiser") and `tests/DriverTests.cpp` use
+`arrays.mini` as their semantically invalid example, so they need a different
+file (e.g. a new `tests/corpus/sema-invalid/array_initialiser.mini`) on
+`origin/main`. That is M3's tree and was left alone.
