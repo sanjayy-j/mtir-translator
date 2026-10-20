@@ -3,7 +3,7 @@
 Each one targets a bug a back end has had, or a divergence.md row.
 """
 
-CORPUS = ["valid/arith", "valid/arrays", "valid/control_flow", "valid/recursion",
+CORPUS = ["valid/arith", "valid/control_flow", "valid/recursion",
           "boundary/nesting", "boundary/shift_edge", "boundary/div_edge"]
 
 SOURCES = {

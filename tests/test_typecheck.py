@@ -70,3 +70,12 @@ def test_symbol_table_scoping():
     assert t.resolve("x").ty == "float"
     t.pop()
     assert t.resolve("x").ty == "int" and t.resolve("y") is None
+
+
+def test_arrays_mini_is_rejected_for_its_array_initialiser():
+    """Decision 0001, option A.  The C++ SemaTests.cpp checks the same file."""
+    from pathlib import Path
+    path = Path(__file__).parent / "corpus" / "valid" / "arrays.mini"
+    with pytest.raises(TypeError_) as e:
+        check(parse(path.read_text(), str(path)))
+    assert e.value.code == "E004"

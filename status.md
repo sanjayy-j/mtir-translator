@@ -1,6 +1,6 @@
 # Status — python-combined
 
-Last updated: 20 Oct 2026. Branch `python-combined` (local, not pushed).
+Last updated: 20 Oct 2026. Branch `python-combined`, pushed to origin.
 
 Each subtask is fixed and committed separately, in order, because later ones
 depend on earlier ones (the interpreter is the oracle the back ends are judged
@@ -87,11 +87,9 @@ Legend: ☐ open · ◐ in progress · ☑ done · ⛔ blocked on a team decisio
 ### 9. ☑ `arrays.mini` rejected with E004
 - Decided 20 Oct 2026 by Krishita (M1): **option A**, so array declarations
   take no initialiser (E004), and reading anything unassigned is undefined.
-  Spec §5, type checker, decision 0001 and `arrays.mini` updated. It now runs
-  (`107.000000`, `140`) and agrees on all four targets.
-- Still to do on `origin/main` (C++, Sanjay): `tests/SemaTests.cpp` and
-  `tests/DriverTests.cpp` use `arrays.mini` as the rejected example and need
-  a new invalid file.
+  Spec §5, type checker and decision 0001 updated.
+- `arrays.mini` keeps its `= 0` and stays the rejected example. Dropping it
+  broke two C++ tests in CI, so that edit was reverted (Krishita's choice).
 
 ### 10. ☑ Docs
 - [x] CLAUDE.md: branch state, setup (`wasmtime`), harness command, known
@@ -140,6 +138,14 @@ Legend: ☐ open · ◐ in progress · ☑ done · ⛔ blocked on a team decisio
 ## Remaining
 
 - All 10 subtasks are done. Team to confirm decision 0001.
-- The push of `python-combined` got a 403; waiting for collaborator access
-  from Sanjay.
+- `python-combined` pushed to origin on 20 Oct 2026.
 - 20 Oct 2026: **10 done** (not committed): CLAUDE.md, docs/divergence.md.
+- 20 Oct 2026: CI on `python-combined` was red on the C++ job, for two reasons:
+  1. The `arrays.mini` edit broke 2 C++ tests that use it as the rejected
+     example, so the edit was reverted (Krishita's choice).
+  2. 3 C++ lexer tests had been failing on `main` since 16 Sept. The lexer
+     was fine; `tests/LexerTests.cpp` did `CHECK_EQ(kindsOf("42")[0], …)`,
+     and `CHECK_EQ` binds `const auto &` to a reference into a temporary
+     vector, so it read freed memory (0 on a Mac, 157 on CI). Fixed with a
+     by-value `firstKind()` helper. This edits the C++ tree, at Krishita's
+     request. All 4 C++ test suites pass locally.

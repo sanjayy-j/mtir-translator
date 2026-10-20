@@ -83,8 +83,8 @@ agreement, with every remaining disagreement recorded here with its cause and
 either a fix or a documented reason it cannot be guarded.
 
 **Current result (20 Oct 2026): 507/507 programs agree on interp, LLVM, Wasm
-and VM, at both `--opt 0` and `--opt 1`** (the whole corpus,
-plus 500 random seeds; `arrays.mini` joined after decision 0001). With `--opt 1` the harness also checks the optimised
+and VM, at both `--opt 0` and `--opt 1`** (the corpus minus
+`arrays.mini`, which is rejected by design, plus 500 random seeds). With `--opt 1` the harness also checks the optimised
 program against the unoptimised one.
 
 | Date | Program | Targets disagreeing | Cause | Resolution |

@@ -116,12 +116,9 @@ checker and `tests/corpus/`. M3 will follow whatever is written down.
   time).
 - `src/sema/typecheck.py` reports E004; the builder's existing E004 refusal
   now cites the spec instead of calling itself a placeholder.
-- `tests/corpus/valid/arrays.mini`: `let xs: int[8] = 0;` became
-  `let xs: int[8];`. It now runs (`107.000000`, `140`) and agrees on all four
-  targets.
-
-**Not yet updated:** the C++ tree. `tests/SemaTests.cpp` ("arrays.mini is
-rejected for its array initialiser") and `tests/DriverTests.cpp` use
-`arrays.mini` as their semantically invalid example, so they need a different
-file (e.g. a new `tests/corpus/sema-invalid/array_initialiser.mini`) on
-`origin/main`. That is M3's tree and was left alone.
+- `tests/corpus/valid/arrays.mini` keeps its `= 0` and is **rejected with
+  E004 by design**: it is the semantically invalid example the C++ tests
+  (`SemaTests.cpp`, `DriverTests.cpp`) and `tests/test_typecheck.py` check.
+  (Dropping the `= 0` was tried and reverted the same day, because it broke
+  those two C++ tests.) Its directory still says `valid/` because that
+  bucket means *syntactically* valid (see "Evidence" above).

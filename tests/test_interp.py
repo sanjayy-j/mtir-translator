@@ -28,7 +28,6 @@ def one_op(op, ty, args, ret_ty=None):
 
 @pytest.mark.parametrize("name,expected,trapped", [
     ("valid/arith", ["55"], False),
-    ("valid/arrays", ["107.000000", "140"], False),
     ("valid/control_flow", ["16"], False),
     ("valid/recursion", ["3628800", "1"], False),
     ("boundary/nesting", ["3"], False),
