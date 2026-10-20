@@ -22,9 +22,9 @@ the code under test. These give the C++ side **real programs** — loops,
 nested branches, recursion, mutual recursion, globals, and the three
 `docs/divergence.md` boundary cases — before the C++ front end exists.
 
-They are a migration scaffold. Once the C++ front end and CIR builder land,
-these tests should be re-pointed at CIR built by the C++ builder, and this
-directory removed along with the Python prototype.
+They were written as a scaffold for the C++ port. On `python-combined` the
+Python implementation is the one the team uses, and these files also serve as
+golden CIR for `tests/test_cir_parser.py`.
 
 **Having these does not mean the front end is migrated.** It is not.
 

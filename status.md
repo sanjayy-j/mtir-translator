@@ -149,3 +149,9 @@ Legend: ☐ open · ◐ in progress · ☑ done · ⛔ blocked on a team decisio
      vector, so it read freed memory (0 on a Mac, 157 on CI). Fixed with a
      by-value `firstKind()` helper. This edits the C++ tree, at Krishita's
      request. All 4 C++ test suites pass locally.
+- 20 Oct 2026: CI is green on `python-combined` (all 3 jobs). Docs updated
+  to match the branch: README (Python is the implementation; team names,
+  setup, usage, harness), CONTRIBUTING (pre-push checks, Python ownership),
+  cir-spec §7 table, tests/cir/README, the builder docstring (it claimed to
+  read `Expr.ty` via a `_ty_of` that doesn't exist), and the CI job name (no
+  longer "retired").

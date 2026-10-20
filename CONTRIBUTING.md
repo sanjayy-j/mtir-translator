@@ -36,8 +36,9 @@ makes it a contract rather than a debug dump.
 ## Before you push
 
 ```bash
-cmake -S . -B build && cmake --build build && ctest --test-dir build
-python -m pytest -q     # while the Python reference is still in the tree
+python -m pytest -q
+python -m tests.harness.differential --random 100
+cmake -S . -B build && cmake --build build && ctest --test-dir build   # only if you touched C++
 ```
 
 Every bug found during development becomes a permanent entry in
@@ -72,7 +73,10 @@ their C++ migration phase.
 `include/mtir/support/` is shared and changes by agreement, because every
 subsystem depends on `Diagnostic` and none of them owns it.
 
-The Python tree under `src/**/*.py` and `tests/test_*.py` is the behavioural
-reference for the parts of the pipeline not yet migrated to C++. Its ownership
-is the same as the C++ counterpart above, and each file is removed once its
-C++ replacement reaches test parity.
+On `python-combined` the Python tree under `src/**/*.py` and
+`tests/test_*.py` is the implementation the team uses. Ownership follows the
+same split: M1 `src/frontend/`, `src/driver.py`; M2 `src/sema/`,
+`src/cir/verifier.py`, `src/cir/interp.py`; M3 the rest of `src/cir/`,
+`src/opt/`, `src/backend/llvm/`; M4 `src/backend/wasm/`,
+`src/backend/stackvm/`, `tests/harness/`. The C++ tree is kept but not
+developed on this branch.

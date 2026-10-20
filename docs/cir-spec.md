@@ -139,21 +139,21 @@ are not touched here.
 
 ## 7. What is built
 
-The implementation language is C++17. A Python prototype of the same design
-is still in the tree as a behavioural reference and is removed subsystem by
-subsystem as each C++ counterpart reaches test parity.
+On `python-combined` the implementation the team uses is **Python**; the
+C++17 port (from `origin/main`'s history) is kept in the tree but not
+developed here.
 
-| Piece | C++ | Python prototype |
+| Piece | Python (the implementation) | C++ port |
 |---|---|---|
-| Types, arithmetic semantics | `include/mtir/cir/Type.h`, `Arith.h` | `src/cir/ir.py` |
-| Values, opcodes, instructions | `Value.h`, `Opcode.h`, `Instruction.h` | `src/cir/ir.py` |
-| Blocks, functions, modules | `Function.h`, `Module.h` | `src/cir/ir.py` |
-| CFG queries | `CFG.h` | `src/cir/cfg.py` |
-| Verifier, rules 1–8 | `Verifier.h` | rules 1–5 only, in `cfg.py` |
-| Printer (Module → text) | `Printer.h` | `src/cir/printer.py` |
-| Parser (text → Module) | `Parser.h` | `src/cir/parser.py` |
-| Builder (AST → Module) | not started — needs the C++ AST | `src/cir/builder.py` |
-| Reference interpreter | not started | never implemented |
+| Types, arithmetic semantics | `src/cir/ir.py` | `include/mtir/cir/Type.h`, `Arith.h` |
+| Values, opcodes, instructions | `src/cir/ir.py` | `Value.h`, `Opcode.h`, `Instruction.h` |
+| Blocks, functions, modules | `src/cir/ir.py` | `Function.h`, `Module.h` |
+| CFG queries | `src/cir/cfg.py` | `CFG.h` |
+| Verifier, rules 1–8 | rules 1–5 in `cfg.py`, plus `src/cir/verifier.py` | `Verifier.h` |
+| Printer (Module → text) | `src/cir/printer.py` | `Printer.h` |
+| Parser (text → Module) | `src/cir/parser.py` | `Parser.h` |
+| Builder (AST → Module) | `src/cir/builder.py` | not started — needs the C++ AST |
+| Reference interpreter | `src/cir/interp.py` | not started |
 
 Two C++ design points worth recording, because both are places where a
 mechanical translation of the prototype would have been wrong:

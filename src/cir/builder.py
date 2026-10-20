@@ -24,15 +24,14 @@ docs/examples/abs.cir rather than an alloca-laden variant of it.
 
 Typing, and the interface to M2
 -------------------------------
-The type checker (M2, ``src/sema/typecheck.py``) is not built yet, so
-``Expr.ty`` is ``None`` on every node the parser produces.  Rather than
-duplicate M2, this builder derives types only from what the *declarations*
-already state -- parameter types, ``let`` types, global types and function
-return types -- and propagates them bottom-up.  It reports nothing: when it
-cannot type an expression it raises ``BuildError`` naming the diagnostic code
-from docs/minilang-spec.md section 7 that M2 will own.  When M2 lands and
-annotates the AST, this file reads ``Expr.ty`` in preference to its own
-derivation (see ``_ty_of``) and the fallback simply stops firing.
+The driver runs this builder *before* the type checker (M2,
+``src/sema/typecheck.py``), so that the builder's coded diagnostics win, and
+the builder does not read ``Expr.ty``.  It derives types only from what the
+*declarations* state -- parameter types, ``let`` types, global types and
+function return types -- and propagates them bottom-up.  When it cannot type
+an expression it raises ``BuildError`` with the diagnostic code from
+docs/minilang-spec.md section 7; the type checker then catches whatever the
+builder lets through.
 
 Not yet built (Review 1 scope, honestly stated)
 -----------------------------------------------

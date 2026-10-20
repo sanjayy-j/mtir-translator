@@ -43,7 +43,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
   test:
-    name: Python reference implementation (retired at migration phase K)
+    name: Python implementation
     runs-on: ubuntu-latest
 
     steps:
