@@ -120,6 +120,9 @@ def run(mod, entry='main', args=()):
 
         def val(x):
             if isinstance(x, Reg): return regs[x.name]
+            # A constant is reduced to its type's range, as every back end
+            # prints it: an i32 constant 4294967296 *is* 0.
+            if isinstance(x, ConstInt) and x.ty in INT_WIDTH: return _wrap(x.value, x.ty)
             if isinstance(x, (ConstInt, ConstFloat)): return x.value
             if isinstance(x, GlobalRef): return ('global', x.name)
             raise ValueError(f'bad operand {x!r}')

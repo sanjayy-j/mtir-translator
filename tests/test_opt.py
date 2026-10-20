@@ -329,3 +329,15 @@ def test_a_trap_survives_optimisation(corpus_module):
     module = run(corpus_module("boundary/div_edge"), 1)
     assert "sdiv" in [i.op for b in module.function("div").blocks
                       for i in b.instrs]
+
+
+# -- regressions found by the differential harness ---------------------------
+def test_fold_reduces_constant_operands_before_dividing():
+    """An i32 constant 4294967296 is 0, so dividing by it must stay a trap."""
+    ins = Instr("sdiv", Ty.I32, Reg("t", Ty.I32), [ConstInt(7), ConstInt(4294967296)])
+    assert constfold.fold(ins) is None
+
+
+def test_fold_keeps_booleans_zero_or_one():
+    ins = Instr("not", Ty.I1, Reg("t", Ty.I1), [ConstInt(0, Ty.I1)])
+    assert constfold.fold(ins) == ConstInt(1, Ty.I1)

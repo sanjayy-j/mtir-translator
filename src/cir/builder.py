@@ -716,12 +716,17 @@ def build(program: ast.Program, name: str = "module") -> Module:
                                      "(scalar globals only)", decl)
         ty = ty_of_node(decl.type_node)
         init: Optional[Value] = None
+        lit, sign = decl.init, 1
+        # A negative literal parses as unary minus applied to a literal.
+        if (isinstance(lit, ast.Unary) and lit.op == "-"
+                and isinstance(lit.operand, (ast.IntLit, ast.FloatLit))):
+            lit, sign = lit.operand, -1
         if decl.init is not None:
-            if isinstance(decl.init, ast.IntLit):
-                init = (ConstFloat(float(decl.init.value)) if ty is Ty.F64
-                        else ConstInt(decl.init.value, ty))
-            elif isinstance(decl.init, ast.FloatLit):
-                init = ConstFloat(decl.init.value)
+            if isinstance(lit, ast.IntLit):
+                init = (ConstFloat(float(sign * lit.value)) if ty is Ty.F64
+                        else ConstInt(wrap_int(sign * lit.value, ty), ty))
+            elif isinstance(lit, ast.FloatLit):
+                init = ConstFloat(sign * lit.value)
             elif isinstance(decl.init, ast.BoolLit):
                 init = ConstInt(1 if decl.init.value else 0, Ty.I1)
             else:

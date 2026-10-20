@@ -108,14 +108,24 @@ class Emitter:
         The continuation label is opened immediately, so the caller can keep
         emitting into what is now a new LLVM basic block.
         """
-        self.needs.add("trap")
         trap_l = self.label(f"trap.{kind}")
         cont_l = self.label(f"cont.{kind}")
         self.line(f"br i1 {cond}, label %{trap_l}, label %{cont_l}")
         self.label_line(trap_l)
-        self.line("call void @llvm.trap()")
+        self.trap()
         self.line("unreachable")
         self.label_line(cont_l)
+
+    def trap(self) -> None:
+        """Flush stdout, then trap.
+
+        Output printed before a trap is observable in CIR (and in the other
+        targets), but stdio buffers it when stdout is a pipe, and llvm.trap
+        kills the process before the buffer is written.
+        """
+        self.needs.add("trap")
+        self.line("call i32 @fflush(ptr null)")
+        self.line("call void @llvm.trap()")
 
     # -- values ------------------------------------------------------------
     def val(self, value: Value, ty: Ty) -> str:
@@ -181,8 +191,7 @@ class Emitter:
             # Not a CIR terminator, so no 'unreachable' here: the block's own
             # terminator still follows.  llvm.trap is noreturn, so control
             # never actually reaches it.
-            self.needs.add("trap")
-            self.line("call void @llvm.trap()")
+            self.trap()
             return
 
         if op in _FMT:
@@ -197,7 +206,9 @@ class Emitter:
             return
 
         if op == "alloca":
-            count = f", i32 {args[0]}" if ins.args else ""
+            # The count is an i32 whatever the element type (a bool array
+            # used to print as 'alloca i1, i32 true').
+            count = f", i32 {self.val(ins.args[0], Ty.I32)}" if ins.args else ""
             self.line(f"{dest} = alloca {lty}{count}")
             return
         if op == "load":
@@ -278,7 +289,7 @@ _RUNTIME = {
         '@.fmt.i32 = private unnamed_addr constant [4 x i8] c"%d\\0A\\00"',
         '@.fmt.f64 = private unnamed_addr constant [4 x i8] c"%f\\0A\\00"',
     ],
-    "trap": ['declare void @llvm.trap()'],
+    "trap": ['declare void @llvm.trap()', 'declare i32 @fflush(ptr)'],
 }
 
 

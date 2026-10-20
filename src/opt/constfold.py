@@ -67,6 +67,15 @@ _FCMP = {
 }
 
 
+def _wrap(value: int, ty: Ty) -> int:
+    """wrap_int, except that i1 stays 0/1 (docs/divergence.md row 5).
+
+    wrap_int treats i1 as a signed one-bit integer, so true would fold to -1
+    and a folded icmp.eq between two booleans would compare -1 with 1.
+    """
+    return value & 1 if ty is Ty.I1 else wrap_int(value, ty)
+
+
 def _as_unsigned(value: int, ty: Ty) -> int:
     return value & ((1 << INT_WIDTH[ty]) - 1)
 
@@ -87,13 +96,13 @@ def _fold_divrem(op: str, lhs: int, rhs: int, ty: Ty) -> Optional[ConstInt]:
     if op in ("udiv", "urem"):
         lhs, rhs = _as_unsigned(lhs, ty), _as_unsigned(rhs, ty)
         result = lhs // rhs if op == "udiv" else lhs % rhs
-        return ConstInt(wrap_int(result, ty), ty)
+        return ConstInt(_wrap(result, ty), ty)
     quotient = abs(lhs) // abs(rhs)
     if (lhs < 0) != (rhs < 0):
         quotient = -quotient
     if op == "sdiv":
-        return ConstInt(wrap_int(quotient, ty), ty)
-    return ConstInt(wrap_int(lhs - quotient * rhs, ty), ty)
+        return ConstInt(_wrap(quotient, ty), ty)
+    return ConstInt(_wrap(lhs - quotient * rhs, ty), ty)
 
 
 def fold(ins: Instr) -> Optional[Value]:
@@ -104,30 +113,34 @@ def fold(ins: Instr) -> Optional[Value]:
         return None
     if any(isinstance(a, ConstFloat) and math.isnan(a.value) for a in args):
         return None
+    # Reduce each constant to its type's range first, as the back ends do: an
+    # i32 constant 4294967296 is 0, so dividing by it must not fold.
+    args = [ConstInt(_wrap(a.value, a.ty), a.ty)
+            if isinstance(a, ConstInt) and a.ty in INT_WIDTH else a for a in args]
     op = ins.op
 
     if op in _INT_BIN and len(args) == 2:
-        return ConstInt(wrap_int(_INT_BIN[op](args[0].value, args[1].value), ty), ty)
+        return ConstInt(_wrap(_INT_BIN[op](args[0].value, args[1].value), ty), ty)
 
     if op in ("shl", "ashr", "lshr") and len(args) == 2:
         count = args[1].value & (INT_WIDTH[ty] - 1)      # row 3: mod width
         value = args[0].value
         if op == "shl":
-            return ConstInt(wrap_int(value << count, ty), ty)
+            return ConstInt(_wrap(value << count, ty), ty)
         if op == "ashr":
-            return ConstInt(wrap_int(value >> count, ty), ty)
-        return ConstInt(wrap_int(_as_unsigned(value, ty) >> count, ty), ty)
+            return ConstInt(_wrap(value >> count, ty), ty)
+        return ConstInt(_wrap(_as_unsigned(value, ty) >> count, ty), ty)
 
     if op in ("sdiv", "udiv", "srem", "urem") and len(args) == 2:
         return _fold_divrem(op, args[0].value, args[1].value, ty)
 
     if op == "not" and len(args) == 1:
-        return ConstInt(wrap_int(~args[0].value, ty), ty)
+        return ConstInt(_wrap(~args[0].value, ty), ty)
 
     if op == "neg" and len(args) == 1:
         if ty is Ty.F64:
             return ConstFloat(-args[0].value)
-        return ConstInt(wrap_int(-args[0].value, ty), ty)
+        return ConstInt(_wrap(-args[0].value, ty), ty)
 
     if op in _FLOAT_BIN and len(args) == 2:
         return ConstFloat(_FLOAT_BIN[op](float(args[0].value),
@@ -153,9 +166,9 @@ def fold(ins: Instr) -> Optional[Value]:
         return None
 
     if op in ("sext", "trunc") and len(args) == 1:
-        return ConstInt(wrap_int(args[0].value, ty), ty)
+        return ConstInt(_wrap(args[0].value, ty), ty)
     if op == "zext" and len(args) == 1:
-        return ConstInt(wrap_int(_as_unsigned(args[0].value, args[0].ty), ty), ty)
+        return ConstInt(_wrap(_as_unsigned(args[0].value, args[0].ty), ty), ty)
     if op == "sitofp" and len(args) == 1:
         return ConstFloat(float(args[0].value))
 
