@@ -84,7 +84,8 @@ def _binop(op, ty, a, b):
 
 
 def _convert(op, ty, v, src_ty):
-    if op == 'sext' or op == 'trunc': return _wrap(v, ty)
+    if op == 'sext': return _wrap(-v if src_ty == Ty.I1 else v, ty)
+    if op == 'trunc': return _wrap(v, ty)
     if op == 'zext': return _wrap(_unsigned(v, src_ty), ty)
     if op == 'sitofp': return float(v)
     if op == 'fptosi':
