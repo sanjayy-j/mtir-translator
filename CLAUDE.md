@@ -10,9 +10,15 @@ The team agreed to use the **Python** implementation. Ignore the C++ tree (`incl
 
 ## Branch state (as of 20 Oct 2026)
 
-- Working branch: **`python-combined`** (local only, **not pushed**).
+- Working branch: **`python-combined`** (local only, **not pushed yet**: the
+  first push got a 403, pending Krishita's collaborator access to
+  `sanjayy-j/mtir-translator`).
   - Base: `da14d31`, the last upstream commit that still had the full Python tree.
-  - Commit on top: `f83794c`, which restores the Review 2 modules.
+  - `f83794c` restores the Review 2 modules; the commits after it fix the
+    back ends and add the harness. `status.md` tracks this work item by item.
+- Krishita makes all commits. Suggest the commit commands (with no `#`
+  comments, because Krishita's zsh doesn't accept them) rather than running
+  `git commit`.
 - `origin/main` is a C++17-only rewrite by Sanjay (commits 15–16 Sept, ending with `5de2ff2` "retire the Python prototype"). It is a legitimate, documented rewrite, not tampering. Its reasons are in `docs/migration.md`.
 - Where the code in this branch came from:
   - **From the repo's Python history (Sanjay):** `cir/builder.py`, `cir/parser.py`, `cir/cfg.py`, `cir/ir.py`, `opt/*`, `backend/llvm/*` (including div/shift guards), and the frontend.
@@ -26,8 +32,9 @@ The team agreed to use the **Python** implementation. Ignore the C++ tree (`incl
 You need Python ≥ 3.10, because the code uses `match`. The system `python3` is 3.9 and will fail.
 
 ```bash
-python3.12 -m venv venv && source venv/bin/activate && pip install pytest
-python -m pytest -q                                  # all pass (7 skipped)
+python3.12 -m venv venv && source venv/bin/activate && pip install pytest wasmtime
+python -m pytest -q                                  # all pass, none skipped (~45 s)
+python -m tests.harness.differential --random 500    # four-way agreement; add --opt 1 too
 python -m src.driver --emit=tokens|ast|cir|ll|wat|sbc <file>.mini
 python -m src.driver --run <file>.mini               # interpreter; exit 4 on trap
 python -m src.driver --opt=1 --emit=cir <file>.mini  # constfold + copyprop + DCE
@@ -50,10 +57,9 @@ Expected `--run` output:
 ## Known open items
 
 - `tests/corpus/valid/arrays.mini` is rejected with **E004**. The builder refuses `let xs: int[8] = 0;` pending a team decision in `docs/decisions/0001-array-initialisers.md`. Don't choose a semantics unilaterally.
-- `vm.py` understands its own opcodes (PUSHI/LOADL/JZ…), but `emit_sbc.py` emits Wasm-style mnemonics, so running the bytecode on the VM does not work yet. This was defect #1 in the Review 2 deck.
-- The Wasm back end uses a program-counter dispatch loop. Relooper structuring (`backend/wasm/structurer.py`) is still a stub.
-- Not built yet: `tests/harness/differential.py` (four-way agreement harness, target ≥98% over a 100-program corpus) and `tests/harness/gen_random.py`.
-- `sema/symtab.py` and `sema/diagnostics.py` are stubs; `typecheck.py` uses a dict environment.
+- Open questions for the team, logged in `status.md`: should an int literal that doesn't fit in `int` (e.g. `4294967296` in an int context, which silently becomes 0) be an error? And what does reading an uninitialised variable give? (LLVM and Wasm return stale memory; the interpreter returns 0.)
+- Fixed since Review 2 (details in `status.md`): the bytecode emitter and VM now agree (defect #1); the Wasm back end validates, runs and is structured (`structurer.py`); the differential harness and random generator exist (507/507 four-way agreement at `--opt 0` and `--opt 1`); `symtab.py` and `diagnostics.py` are implemented and `typecheck.py` reports E001–E012.
+- How the harness runs each target: LLVM through `clang` (`lli` isn't installed), Wasm through the `wasmtime` pip package. Tests skip a target whose tool is missing.
 
 ## Team and ownership (see CONTRIBUTING.md)
 

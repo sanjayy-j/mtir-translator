@@ -88,9 +88,11 @@ Legend: ☐ open · ◐ in progress · ☑ done · ⛔ blocked on a team decisio
 - Needs the team decision in docs/decisions/0001-array-initialisers.md.
   Not changed. (The doc recommends Option A: forbid the initialiser.)
 
-### 10. ☐ Docs
-- [ ] Update CLAUDE.md "Known open items" and docs/divergence.md
-      ("where each row is realised", observed-divergence log).
+### 10. ☑ Docs
+- [x] CLAUDE.md: branch state, setup (`wasmtime`), harness command, known
+      open items.
+- [x] docs/divergence.md: per-row table for the Python back ends, and the
+      observed-divergence log (5 entries) plus the two unguarded cases.
 
 ## Log
 
@@ -132,20 +134,8 @@ Legend: ☐ open · ◐ in progress · ☑ done · ⛔ blocked on a team decisio
 
 ## Remaining
 
-- **9** is blocked on the team's array-initialiser decision.
-- **10** (docs: CLAUDE.md known items, divergence.md log) is next. Waiting for
-  "go".
-
-## Uncommitted work and suggested commits (in order)
-
-1. `git add src/sema/ tests/test_typecheck.py` →
-   `[M2] sema: symbol table, coded diagnostics E001-E012, int widening and shadowing`
-2. `git add src/backend/llvm/emit_ll.py src/cir/builder.py src/cir/interp.py src/opt/constfold.py tests/test_opt.py` →
-   `fix: bugs found by differential fuzzing`
-3. `git add tests/harness/differential.py tests/harness/gen_random.py tests/test_differential.py` →
-   `[M8b] harness: four-way differential harness and random program generator`
-4. `git add tests/test_llvm_backend.py` →
-   `[M5] tests: verify generated IR with clang when llvm-as is missing`
-5. `git add src/backend/wasm/ tests/harness/runners.py tests/test_structurer.py tests/test_wasm_backend.py` →
-   `[M6b] wasm: dominator-tree structurer replaces the dispatch loop`
-6. `status.md` and `CLAUDE.md`: commit whenever you like.
+- **9** is blocked on the team's array-initialiser decision
+  (docs/decisions/0001). Everything else is done.
+- The push of `python-combined` got a 403; waiting for collaborator access
+  from Sanjay.
+- 20 Oct 2026: **10 done** (not committed): CLAUDE.md, docs/divergence.md.
