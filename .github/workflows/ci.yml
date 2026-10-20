@@ -70,6 +70,41 @@ jobs:
       - name: CIR printer golden file
         run: python -m src.driver --demo-cir | diff - docs/examples/abs.cir
 
+  # Objective O4: the fixed corpus plus 500 generated programs must agree on
+  # all four targets.  This runs on x86, where inf - inf is a negative NaN;
+  # the 507/507 figure was first measured on ARM, where it is positive.
+  differential:
+    name: Four-way differential (500 seeds)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        opt: [0, 1]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install clang and dev dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+          python -m pip install -r requirements.txt
+
+      # The harness skips a target whose tool is missing and still exits 0,
+      # so a run that compared fewer than four targets is failed explicitly.
+      - name: Run the harness
+        run: |
+          set -o pipefail
+          python -m tests.harness.differential --random 500 --opt ${{ matrix.opt }} | tee differential.log
+          if grep -q '^skipped' differential.log; then
+            echo "::error::a target was skipped, so this run is not a four-way comparison"
+            exit 1
+          fi
+
   validate-examples:
     name: Validate hand-written target files
     runs-on: ubuntu-latest

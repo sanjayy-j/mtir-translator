@@ -105,6 +105,10 @@ wraps, shift counts are taken modulo the operand width, division by zero and
 `INT_MIN / -1` trap, out-of-range float→int conversion traps, and array
 indices are bounds-checked.
 
+The sign of a NaN is unspecified. `print_float` of a NaN may print `nan` or
+`-nan` depending on the target and the host CPU (`inf - inf` is a negative NaN
+on x86 and a positive one on ARM), and the two are equivalent.
+
 ## 7. Diagnostics (M2 must detect all twelve)
 
 | Code | Condition |

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.harness.differential import corpus_paths, run_all
+from tests.harness.differential import _same, corpus_paths, run_all
 from tests.harness.gen_random import generate
 
 # Rejected with E004 by design (decision 0001); the C++ tests use it as
@@ -41,6 +41,22 @@ def test_out_of_range_int_literal_wraps_everywhere(seed):
     interpreter and the constant folder used the unwrapped value; every back
     end wraps it to 0 (and so traps on dividing by it)."""
     check(run_all(source=generate(seed), name=f"seed{seed}", opt=1))
+
+
+@pytest.mark.parametrize("seed", [93, 167, 286])
+@pytest.mark.parametrize("opt", [0, 1])
+def test_nan_sign_is_not_compared(seed, opt):
+    """Regression: these seeds print inf - inf.  On x86 that NaN is negative
+    and the native binary prints "-nan"; the other targets print "nan"."""
+    check(run_all(source=generate(seed), name=f"seed{seed}", opt=opt))
+
+
+def test_same_ignores_only_the_sign_of_nan():
+    # Runs without clang, so the rule is checked on machines that skip llvm.
+    want = (0, "1\nnan\n-inf", False)
+    assert _same("llvm", (0, "1\n-nan\n-inf", False), want)
+    assert not _same("llvm", (0, "1\nnan\ninf", False), want)
+    assert not _same("llvm", (0, "-1\nnan\n-inf", False), want)
 
 
 def test_generator_is_deterministic():
