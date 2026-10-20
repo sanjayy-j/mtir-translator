@@ -36,7 +36,8 @@ derivation (see ``_ty_of``) and the fallback simply stops firing.
 
 Not yet built (Review 1 scope, honestly stated)
 -----------------------------------------------
-  * array ``let`` with an initialiser -- needs M2's E004 first;
+  * array ``let`` with an initialiser is an error by design (E004,
+    decision 0001), not a missing feature;
   * global arrays -- only scalar globals are lowered;
   * array bounds checks -- realised per target, see docs/divergence.md row 7.
 """
@@ -319,7 +320,7 @@ class _FnBuilder:
             if node.init is not None:
                 raise BuildError(
                     "E004", "an array declaration cannot take an initialiser "
-                            "(array initialisers need M2's E004 check first)", node)
+                            "(minilang-spec.md section 5)", node)
             elem = elem_ty_of_node(tn)
             base = self.alloca(node.name, elem, tn.array_len)
             self.declare(node.name,
