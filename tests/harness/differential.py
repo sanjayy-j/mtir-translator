@@ -11,10 +11,13 @@ Run one program through every execution path and require agreement:
   5. emit .sbc, run under the reference VM
   6. compare (return value, stdout, trapped) four ways
 
-Two comparison rules follow from what each target can observe:
+Three comparison rules follow from what each target can observe:
   * a native process only reports its exit status, i.e. main's return value
     mod 256, so the LLVM value is compared mod 256;
-  * once a program traps, its return value is meaningless and is ignored.
+  * once a program traps, its return value is meaningless and is ignored;
+  * the sign of a NaN is unspecified (spec §6), so a printed "-nan" matches
+    "nan".  inf - inf is a negative NaN on x86 and a positive one on ARM,
+    and C's printf shows the sign.
 
 Objective O4: >= 98% four-way agreement over the 100-program corpus, with
 every remaining disagreement documented in docs/divergence.md.
@@ -62,11 +65,15 @@ class Outcome:
         return [t for t, r in self.results.items() if not _same(t, r, oracle)]
 
 
+def _unsigned_nan(stdout: str) -> str:
+    return "\n".join("nan" if line == "-nan" else line for line in stdout.split("\n"))
+
+
 def _same(target, got, want) -> bool:
     if isinstance(got, str) or isinstance(want, str): return False
     gv, gout, gtrap = got
     wv, wout, wtrap = want
-    if (gout, gtrap) != (wout, wtrap): return False
+    if (_unsigned_nan(gout), gtrap) != (_unsigned_nan(wout), wtrap): return False
     if gtrap: return True
     if target == "llvm": return gv & 0xFF == wv & 0xFF
     return gv == wv
