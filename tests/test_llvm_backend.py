@@ -345,24 +345,37 @@ def test_infinity_uses_the_hexadecimal_form():
 
 
 # -- the real verifier -----------------------------------------------------
-LLVM_AS = shutil.which("llvm-as")
+# llvm-as is preferred; any clang also parses and verifies textual IR when it
+# compiles it (`-x ir`), and Apple's clang ships with Xcode, so these tests
+# run on a stock Mac too.
+def _verifier():
+    if shutil.which("llvm-as"):
+        return lambda src, out: [shutil.which("llvm-as"), str(src), "-o", str(out)]
+    if shutil.which("clang"):
+        return lambda src, out: [shutil.which("clang"), "-c", "-x", "ir", "-w",
+                                 str(src), "-o", str(out)]
+    return None
 
 
-@pytest.mark.skipif(LLVM_AS is None, reason="llvm-as is not installed")
+VERIFY = _verifier()
+needs_verifier = pytest.mark.skipif(VERIFY is None,
+                                    reason="neither llvm-as nor clang is installed")
+
+
+@needs_verifier
 @pytest.mark.parametrize("name", ["valid/arith", "valid/control_flow",
                                   "valid/recursion", "boundary/nesting",
                                   "boundary/div_edge", "boundary/shift_edge"])
 def test_llvm_as_accepts_the_generated_ir(name, corpus_module, tmp_path):
     path = tmp_path / "out.ll"
     path.write_text(emit(corpus_module(name)))
-    result = subprocess.run([LLVM_AS, str(path), "-o", str(tmp_path / "out.bc")],
+    result = subprocess.run(VERIFY(path, tmp_path / "out.o"),
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.skipif(LLVM_AS is None, reason="llvm-as is not installed")
+@needs_verifier
 def test_llvm_as_accepts_the_generated_golden_file(tmp_path):
-    result = subprocess.run(
-        [LLVM_AS, str(EXAMPLES / "abs.gen.ll"), "-o", str(tmp_path / "abs.bc")],
-        capture_output=True, text=True)
+    result = subprocess.run(VERIFY(EXAMPLES / "abs.gen.ll", tmp_path / "abs.o"),
+                            capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
