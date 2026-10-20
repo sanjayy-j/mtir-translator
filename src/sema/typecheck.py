@@ -102,9 +102,10 @@ class _Checker:
         if isinstance(s, A.Block): self.block(s)
         elif isinstance(s, A.Let):
             ty = _tyname(s.type_node)
-            # An array initialiser is refused by the builder (E004) pending
-            # docs/decisions/0001-array-initialisers.md; nothing to check here.
-            if s.init is not None and s.type_node.array_len is None:
+            if s.init is not None and s.type_node.array_len is not None:
+                # minilang-spec.md section 5, decision 0001 (option A).
+                self.err('E004', "an array declaration cannot take an initialiser", s)
+            if s.init is not None:
                 self.assignable(self.expr(s.init), ty, s.init, 'E004')
             if not self.syms.declare(Symbol(s.name, 'var', ty, s)):
                 self.err('E002', f"duplicate declaration of {s.name!r} in the same scope", s)
