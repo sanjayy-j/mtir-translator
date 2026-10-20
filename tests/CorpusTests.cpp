@@ -2,15 +2,16 @@
 //
 // Every other C++ test in this suite uses a hand-written .cir snippet: short,
 // regular, and written by the same person as the code under test.  The
-// fixtures in tests/cir/ are different -- they are the CIR that the Python
-// reference lowers from the MiniLang corpus, so they contain loops, nested
-// branches, recursion, mutual recursion, globals and the three
-// docs/divergence.md boundary cases.
+// fixtures in tests/cir/ are different -- they are the CIR for the MiniLang
+// corpus, so they contain loops, nested branches, recursion, mutual
+// recursion, globals and the three docs/divergence.md boundary cases.
 //
-// This is a migration scaffold and it is temporary.  When the C++ front end
-// and CIR builder land, these tests should be re-pointed at CIR built by the
-// C++ builder and tests/cir/ deleted with the Python prototype.  Their
-// presence does NOT mean the front end is migrated; it is not.
+// They were introduced as a migration scaffold, while there was no C++ front
+// end to build CIR with.  They are kept now for a better reason: a back end
+// can be tested with no front end in the picture at all, which is the whole
+// point of having a textual IR (docs/cir-spec.md section 1).  Deleting them
+// would quietly make every back-end test depend on the front end being
+// correct.  BuilderTests.cpp pins the front end against them separately.
 //
 // See tests/cir/README.md for provenance and how to regenerate.
 

@@ -224,6 +224,43 @@ if(BUILD_TESTING)
     set_tests_properties(llvm_as_accepts_generated_ir PROPERTIES
       SKIP_REGULAR_EXPRESSION "SKIPPED")
   endif()
+
+  # -- the real WebAssembly assembler, when it is available ----------------
+  #
+  # Same arrangement, and the same reason: tests/WasmTests.cpp checks
+  # structural properties of the emitted text, which is a much weaker claim
+  # than "wat2wasm accepts it".  When WABT is absent the test is registered
+  # as skipped, so a run that validated no WebAssembly cannot be mistaken for
+  # one that did.
+  find_program(MTIR_WAT2WASM NAMES wat2wasm)
+  find_program(MTIR_WASM_VALIDATE NAMES wasm-validate)
+  if(MTIR_WAT2WASM)
+    add_test(NAME wat2wasm_accepts_generated_wasm
+      COMMAND ${CMAKE_COMMAND}
+        -DMTIRC=$<TARGET_FILE:mtirc>
+        -DWAT2WASM=${MTIR_WAT2WASM}
+        -DWASM_VALIDATE=${MTIR_WASM_VALIDATE}
+        -DROOT=${CMAKE_CURRENT_SOURCE_DIR}
+        -DOUTDIR=${CMAKE_CURRENT_BINARY_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Wat2WasmCheck.cmake)
+  else()
+    message(STATUS "wat2wasm not found: the WebAssembly validation test will be skipped")
+    add_test(NAME wat2wasm_accepts_generated_wasm
+      COMMAND ${CMAKE_COMMAND} -E echo
+        "SKIPPED: wat2wasm is not installed; the generated WebAssembly was not validated")
+    set_tests_properties(wat2wasm_accepts_generated_wasm PROPERTIES
+      SKIP_REGULAR_EXPRESSION "SKIPPED")
+  endif()
+
+  # -- execution ------------------------------------------------------------
+  #
+  # Needs no external tool: the stack VM is part of this build, which is why
+  # this is the one target whose behaviour CI can check everywhere.
+  add_test(NAME run_corpus_on_the_stack_vm
+    COMMAND ${CMAKE_COMMAND}
+      -DMTIRC=$<TARGET_FILE:mtirc>
+      -DROOT=${CMAKE_CURRENT_SOURCE_DIR}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunCorpusCheck.cmake)
 endif()
 
 message(STATUS "mtir-translator ${PROJECT_VERSION}, C++${CMAKE_CXX_STANDARD}, build type ${CMAKE_BUILD_TYPE}")

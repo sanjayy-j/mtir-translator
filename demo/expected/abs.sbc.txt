@@ -1,0 +1,15 @@
+;; sbc v1 -- CIR module 'abs' lowered by the MTIR stack bytecode back end (M7)
+.func abs(i32) -> i32
+  .frame 0
+  .local 0 $x
+  0000  local.get 0  ;; $x
+  0001  i32.const 0
+  0002  i32.lt_s
+  0003  jz 8
+  0004  i32.const 0
+  0005  local.get 0  ;; $x
+  0006  i32.sub
+  0007  return
+  0008  local.get 0  ;; $x
+  0009  return
+.end
