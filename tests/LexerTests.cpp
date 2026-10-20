@@ -24,6 +24,11 @@ std::vector<TokKind> kindsOf(const std::string &src) {
   return out;
 }
 
+// By value on purpose: CHECK_EQ binds `const auto &` to its argument, and
+// kindsOf(src)[0] would be a reference into a temporary vector destroyed at
+// the end of that statement, so the check would read freed memory.
+TokKind firstKind(const std::string &src) { return kindsOf(src)[0]; }
+
 std::vector<std::string> textsOf(const std::string &src) {
   std::vector<std::string> out;
   for (const Token &t : tokenize(src).tokens)
@@ -66,20 +71,20 @@ MTIR_TEST("lexer", "a keyword prefix is still an identifier") {
 MTIR_TEST("lexer", "longest match wins") {
   // '<<' is one token, never two '<'.
   CHECK_EQ(kindsOf("<<").size(), std::size_t{1});
-  CHECK_EQ(kindsOf("<<")[0], TokKind::Shl);
-  CHECK_EQ(kindsOf("<=")[0], TokKind::Le);
-  CHECK_EQ(kindsOf("->")[0], TokKind::Arrow);
-  CHECK_EQ(kindsOf("==")[0], TokKind::Eq);
-  CHECK_EQ(kindsOf("&&")[0], TokKind::AndAnd);
+  CHECK_EQ(firstKind("<<"), TokKind::Shl);
+  CHECK_EQ(firstKind("<="), TokKind::Le);
+  CHECK_EQ(firstKind("->"), TokKind::Arrow);
+  CHECK_EQ(firstKind("=="), TokKind::Eq);
+  CHECK_EQ(firstKind("&&"), TokKind::AndAnd);
   // ...but a lone '<' is still LT.
   CHECK_EQ(kindsOf("< <").size(), std::size_t{2});
 }
 
 MTIR_TEST("lexer", "integer literals: decimal, hex and separators") {
-  CHECK_EQ(kindsOf("42")[0], TokKind::IntLit);
-  CHECK_EQ(kindsOf("0xFF")[0], TokKind::IntLit);
-  CHECK_EQ(kindsOf("0XdeadBEEF")[0], TokKind::IntLit);
-  CHECK_EQ(kindsOf("1_000_000")[0], TokKind::IntLit);
+  CHECK_EQ(firstKind("42"), TokKind::IntLit);
+  CHECK_EQ(firstKind("0xFF"), TokKind::IntLit);
+  CHECK_EQ(firstKind("0XdeadBEEF"), TokKind::IntLit);
+  CHECK_EQ(firstKind("1_000_000"), TokKind::IntLit);
   const std::vector<std::string> texts = textsOf("1_000");
   CHECK_EQ(texts.size(), std::size_t{1});
   if (!texts.empty())
@@ -87,10 +92,10 @@ MTIR_TEST("lexer", "integer literals: decimal, hex and separators") {
 }
 
 MTIR_TEST("lexer", "float literals") {
-  CHECK_EQ(kindsOf("1.5")[0], TokKind::FloatLit);
-  CHECK_EQ(kindsOf("1e9")[0], TokKind::FloatLit);
-  CHECK_EQ(kindsOf("2.5e-3")[0], TokKind::FloatLit);
-  CHECK_EQ(kindsOf("1E+10")[0], TokKind::FloatLit);
+  CHECK_EQ(firstKind("1.5"), TokKind::FloatLit);
+  CHECK_EQ(firstKind("1e9"), TokKind::FloatLit);
+  CHECK_EQ(firstKind("2.5e-3"), TokKind::FloatLit);
+  CHECK_EQ(firstKind("1E+10"), TokKind::FloatLit);
 }
 
 MTIR_TEST("lexer", "a dot is part of a number only when a digit follows") {
