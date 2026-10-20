@@ -2,10 +2,12 @@
 
 Module M6c.  Owner: Member 4.
 
-Control flow uses a program-counter dispatch loop: every CIR block becomes one
-arm of a `loop`, and a branch sets `$.pc` and re-enters the loop.  That is
-valid structured Wasm for any CFG, reducible or not; structurer.py is where
-nicer nesting will come from.
+Control flow is rebuilt as nested block/loop/if by structurer.py (Ramsey's
+dominator-tree algorithm).  If a CFG is irreducible -- MiniLang cannot
+produce one -- the emitter falls back to a program-counter dispatch loop:
+every CIR block becomes one arm of a `loop`, and a branch sets `$.pc` and
+re-enters it.  `emit(mod, structured=False)` forces the fallback, which keeps
+it tested.
 
 Memory (docs/divergence.md row 8): Wasm locals have no address, so every
 alloca lives in linear memory.  A shadow stack pointer global `$.sp` starts at
@@ -29,6 +31,7 @@ from __future__ import annotations
 import math
 
 from ...cir.ir import *
+from . import structurer as S
 
 MEMORY_PAGES = 16                    # 1 MiB; the shadow stack starts at the top
 ELEM_SIZE = 8
@@ -66,7 +69,7 @@ _ICMP = {'eq': 'eq', 'ne': 'ne', 'slt': 'lt_s', 'sle': 'le_s', 'sgt': 'gt_s', 's
 _FCMP = {'oeq': 'eq', 'one': 'ne', 'olt': 'lt', 'ole': 'le', 'ogt': 'gt', 'oge': 'ge'}
 
 
-def emit(mod):
+def emit(mod, structured=True):
     top = MEMORY_PAGES * 65536
     lines = ['(module',
              '  (import "env" "print_int" (func $print_int (param i32)))',
@@ -77,7 +80,7 @@ def emit(mod):
         init = g.init.value if g.init is not None else 0
         lines.append(f'  (global ${g.name} (mut {wt(g.ty)}) {_const(g.ty, init)})')
     for f in mod.functions:
-        lines += _Fn(f).emit()
+        lines += _Fn(f).emit(structured)
         lines.append(f'  (export "{f.name}" (func ${f.name}))')
     lines.append(')')
     return '\n'.join(lines) + '\n'
@@ -120,14 +123,44 @@ class _Fn:
         out.append(f'(return {val(t.args[0])})' if t.args else '(return)')
         return out
 
-    def emit(self):
+    def emit(self, structured=True):
         lines = [self.header()]
-        body = self.prologue() + self.dispatch()
+        try:
+            flow = self.structured() if structured else self.dispatch()
+        except S.Irreducible:
+            flow = self.dispatch()
+        body = self.prologue() + flow
         lines += ['    ' + x for x in body]
         lines.append('  )')
         return lines
 
-    # -- control flow: the program-counter dispatch loop --------------------
+    # -- control flow: nested regions from structurer.py ---------------------
+    def structured(self):
+        # Every path ends in a return or a br, so the end is unreachable; the
+        # explicit (unreachable) makes that visible to the Wasm validator.
+        return self.region(S.structure(self.f)) + ['(unreachable)']
+
+    def region(self, nodes):
+        out = []
+        for n in nodes:
+            if isinstance(n, S.Block):
+                out += [f'(block $B.{n.label}'] + ['  ' + x for x in self.region(n.body)] + [')']
+            elif isinstance(n, S.Loop):
+                out += [f'(loop $L.{n.label}'] + ['  ' + x for x in self.region(n.body)] + [')']
+            elif isinstance(n, S.Code):
+                for i in n.block.instrs[:-1]: out += self.instr(i)
+            elif isinstance(n, S.If):
+                out.append(f'(if {val(n.cond)}')
+                out += ['  (then'] + ['    ' + x for x in self.region(n.then)] + ['  )']
+                out += ['  (else'] + ['    ' + x for x in self.region(n.else_)] + ['  )']
+                out.append(')')
+            elif isinstance(n, S.Br):
+                out.append(f'(br ${"B" if n.kind == "block" else "L"}.{n.target})')
+            else:
+                out += self.ret(n.instr)
+        return out
+
+    # -- control flow: the program-counter dispatch loop (fallback) ----------
     def dispatch(self):
         f = self.f
         index = {b.label: n for n, b in enumerate(f.blocks)}
@@ -191,7 +224,9 @@ class _Fn:
             return set_(self.convert(op, i.ty, getattr(i.args[0], 'ty', Ty.I32), a[0]))
         if op in _BIN:
             out = []
-            if op == 'srem':
+            divisor = i.args[1] if len(i.args) > 1 else None
+            const_ok = isinstance(divisor, ConstInt) and wrap_int(divisor.value, i.ty) != -1
+            if op == 'srem' and not const_ok:
                 lo = -(1 << (INT_WIDTH[i.ty] - 1))
                 out.append(f'(if (i32.and ({p}.eq {a[0]} ({p}.const {lo})) '
                            f'({p}.eq {a[1]} ({p}.const -1))) (then (unreachable)))')

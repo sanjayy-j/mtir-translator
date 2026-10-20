@@ -27,7 +27,7 @@ def run_interp(module):
 
 
 # -- WebAssembly ------------------------------------------------------------
-def run_wasm(module):
+def run_wasm(module, structured=True):
     try:
         import wasmtime
     except ImportError as e:
@@ -37,7 +37,7 @@ def run_wasm(module):
     out = []
     engine = wasmtime.Engine()
     store = wasmtime.Store(engine)
-    wasm_mod = wasmtime.Module(engine, wasmtime.wat2wasm(emit(module)))
+    wasm_mod = wasmtime.Module(engine, wasmtime.wat2wasm(emit(module, structured)))
     linker = wasmtime.Linker(engine)
     i32, f64 = wasmtime.ValType.i32(), wasmtime.ValType.f64()
     linker.define_func("env", "print_int", wasmtime.FuncType([i32], []),

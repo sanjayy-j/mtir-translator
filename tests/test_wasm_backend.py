@@ -37,3 +37,15 @@ def test_program_agrees(mini_module, name):
 def test_traps_are_observed(mini_module):
     assert agree(mini_module(SOURCES["srem_int_min_traps"]))[2] is True
     assert agree(mini_module(SOURCES["bounds_trap"]))[2] is True
+
+
+# -- control flow: structured (default) vs the dispatch-loop fallback --------
+@pytest.mark.parametrize("name", CORPUS)
+def test_dispatch_fallback_still_agrees(corpus_module, name):
+    module = corpus_module(name)
+    assert run_wasm(module, structured=False) == run(module)
+
+
+@pytest.mark.parametrize("name", CORPUS)
+def test_structured_output_has_no_dispatch_loop(corpus_module, name):
+    assert "$dispatch" not in emit(corpus_module(name))
