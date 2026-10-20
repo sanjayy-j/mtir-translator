@@ -1,11 +1,13 @@
-"""CIR -> flat stack bytecode.
+"""CIR -> textual stack bytecode."""
+from ...backend.wasm.reg2stack import lower_function
+from ...cir.ir import *
 
-Module M7.  Owner: Member 4.
-Status: PLANNED -- Week 9.
-"""
-def emit(module):
-    """Reuses reg2stack, but keeps labels flat with absolute jump offsets --
-    no structuring pass.  The difference in emitted instruction count against
-    the WebAssembly back end isolates the cost of structuring."""
-    raise NotImplementedError(
-        "stack bytecode back end is scheduled for Week 9 (M7, Member 4)")
+def emit(mod):
+    lines=[]
+    for f in mod.functions:
+        lines.append(f'{f.name}:')
+        seqs=lower_function(f)
+        for label,seq in seqs.items():
+            if label!='entry': lines.append(f'{label}:')
+            for x in seq: lines.append('        '+str(x))
+    return '\n'.join(lines)+'\n'

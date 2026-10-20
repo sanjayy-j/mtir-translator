@@ -40,18 +40,30 @@ def test_syntax_error_exits_1(tmp_path, capsys):
     assert "syntax error" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("stage", ["wat", "sbc"])
-def test_unimplemented_stages_report_owner_and_week(stage, capsys):
-    """A stage that is not built yet must say so precisely, rather than
-    crashing -- the state of the project is readable from the tool.
+def test_emit_wat(capsys):
+    assert main(["--emit=wat", str(EXAMPLE)]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("(module")
+    assert "(func $abs" in out
 
-    'cir' and 'll' were on this list until M3a and M5 landed; they now have
-    the positive tests below instead.
-    """
-    assert main([f"--emit={stage}", str(EXAMPLE)]) == 3
-    err = capsys.readouterr().err
-    assert "not implemented yet" in err
-    assert "Member" in err and "Week" in err
+
+def test_emit_sbc(capsys):
+    assert main(["--emit=sbc", str(EXAMPLE)]) == 0
+    out = capsys.readouterr().out
+    assert "abs:" in out and "main:" in out
+
+
+def test_run_prints_program_output(capsys):
+    assert main(["--run", str(EXAMPLE)]) == 0
+    assert capsys.readouterr().out.split() == ["7", "0"]
+
+
+def test_run_trap_exits_4(capsys):
+    src = Path(__file__).parents[1] / "tests" / "corpus" / "boundary" / "div_edge.mini"
+    assert main(["--run", str(src)]) == 4
+    captured = capsys.readouterr()
+    assert captured.out.split() == ["3"]
+    assert "trap" in captured.err
 
 
 # -- stages that M3 has since implemented ----------------------------------

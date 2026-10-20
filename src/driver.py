@@ -29,6 +29,7 @@ from .cir.parser import CirParseError, parse_cir
 from .frontend import ast_nodes, parser as mini_parser
 from .frontend.lexer import LexError, tokenize
 from .frontend.parser import ParseError
+from .sema.typecheck import TypeError_
 
 EMIT_CHOICES = ["tokens", "ast", "cir", "ll", "wat", "sbc"]
 
@@ -73,22 +74,19 @@ def _to_cir(src: str, path: Path, opt_level: int):
     """
     from .opt import run as run_opt
 
+    from .cir.verifier import verify
+    from .sema.typecheck import check
+
     if path.suffix == ".cir":
         module = parse_cir(src, path.stem)
     else:
-        module = build(mini_parser.parse(src, str(path)), path.stem)
+        # The builder runs first so its coded diagnostics (E001...) win; the
+        # type checker then catches what the builder lets through.
+        program = mini_parser.parse(src, str(path))
+        module = build(program, path.stem)
+        check(program)
+    verify(module)
     return run_opt(module, opt_level)
-
-
-def _not_yet(stage: str, module: str, owner: str, week: str) -> int:
-    print(
-        f"error: --emit={stage} is not implemented yet.\n"
-        f"       {module} is owned by {owner} and is scheduled for {week}.\n"
-        f"       Implemented today: --emit=tokens, --emit=ast, --emit=cir, "
-        f"--emit=ll, --demo-cir, --demo-stack.",
-        file=sys.stderr,
-    )
-    return 3
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -101,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="optimisation level: 0 raw, 1 constant folding + "
                          "copy propagation + dead-code elimination")
     ap.add_argument("--run", action="store_true",
-                    help="execute the emitted target (Week 9)")
+                    help="execute the program on the CIR reference interpreter; "
+                         "exit status 4 if it traps")
     ap.add_argument("--demo-cir", action="store_true",
                     help="print the hand-built abs() CIR module")
     ap.add_argument("--demo-stack", action="store_true",
@@ -144,20 +143,37 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{tok.line:>4}:{tok.col:<4} {tok.kind.name:<12} {tok.text!r}")
             return 0
 
-        if args.emit == "ast":
+        if args.emit == "ast" and not args.run:
             program = mini_parser.parse(src, str(path))
             print(ast_nodes.dump(program))
             return 0
 
-        if args.emit in ("cir", "ll"):
-            module = _to_cir(src, path, args.opt)
-            if args.emit == "cir":
-                from .cir.printer import print_module
-                sys.stdout.write(print_module(module))
-            else:
-                from .backend.llvm.emit_ll import emit as emit_ll
-                sys.stdout.write(emit_ll(module))
+        module = _to_cir(src, path, args.opt)
+
+        if args.run:
+            from .cir.interp import run
+            value, output, trapped = run(module)
+            if output:
+                print(output)
+            if trapped:
+                print("trap", file=sys.stderr)
+                return 4
+            print(value)
             return 0
+
+        if args.emit == "cir":
+            from .cir.printer import print_module
+            sys.stdout.write(print_module(module))
+        elif args.emit == "ll":
+            from .backend.llvm.emit_ll import emit as emit_ll
+            sys.stdout.write(emit_ll(module))
+        elif args.emit == "wat":
+            from .backend.wasm.emit_wat import emit as emit_wat
+            sys.stdout.write(emit_wat(module))
+        else:
+            from .backend.stackvm.emit_sbc import emit as emit_sbc
+            sys.stdout.write(emit_sbc(module))
+        return 0
 
     except LexError as e:
         print(f"{path}:{e}", file=sys.stderr)
@@ -165,15 +181,9 @@ def main(argv: list[str] | None = None) -> int:
     except ParseError as e:
         print(f"{path}:{e}", file=sys.stderr)
         return 1
-    except (BuildError, CirParseError) as e:
-        print(f"{path}:{e}", file=sys.stderr)
+    except (BuildError, CirParseError, TypeError_, ValueError) as e:
+        print(f"{path}: error: {e}", file=sys.stderr)
         return 1
-
-    pending = {
-        "wat": ("WebAssembly back end (M6c)", "Member 4", "Weeks 7-8"),
-        "sbc": ("stack bytecode back end (M7)", "Member 4", "Week 9"),
-    }
-    return _not_yet(args.emit, *pending[args.emit])
 
 
 if __name__ == "__main__":
