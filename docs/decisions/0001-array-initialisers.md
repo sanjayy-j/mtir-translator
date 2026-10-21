@@ -1,6 +1,8 @@
 # Decision needed: what does `let xs: int[8] = 0;` mean?
 
-**Status:** OPEN — needs a team decision before M2 writes the type checker.
+**Status:** DECIDED, 20 Oct 2026: **Option A** (forbid the initialiser).
+Decided by Krishita Gupta (M1, owner of `minilang-spec.md`); to be confirmed
+by the team.
 **Raised by:** Member 3, during the C++ migration audit.
 **Affects:** M1 (grammar/spec), M2 (type checker), M3 (CIR builder), M4 (corpus).
 
@@ -42,16 +44,12 @@ semantically valid, and the file is correctly placed for the assertion that is
 actually made about it. The file has been unchanged since the initial scaffold
 commit `3027aef`, i.e. it predates every implementation.
 
-**Current behaviour.** The compiler refuses to lower it:
+**Current behaviour.** The Python reference refuses to lower it:
 
 ```
 tests/corpus/valid/arrays.mini:5:5: error[E004]: an array declaration cannot
-take an initialiser; see docs/decisions/0001-array-initialisers.md
+take an initialiser (array initialisers need M2's E004 check first)
 ```
-
-The Python prototype refused it too, with the same code at the same position;
-its message pointed at another member's unfinished work rather than at this
-record.
 
 That refusal was a placeholder chosen so the builder would not invent
 semantics — it is *not* a decision, and it is why `arrays.mini` is the one
@@ -110,8 +108,17 @@ it.
 **Whoever owns the decision:** M1 owns `minilang-spec.md`; M2 owns the type
 checker and `tests/corpus/`. M3 will follow whatever is written down.
 
-## What has *not* been done
+## Outcome (20 Oct 2026, Python implementation on `python-combined`)
 
-`tests/corpus/valid/arrays.mini` has **not** been modified. No semantics have
-been invented in either implementation. This note records the finding and the
-options only.
+- `minilang-spec.md` §5: an array declaration takes no initialiser (E004);
+  elements start undefined and must be assigned before they are read. Reading
+  any unassigned local or element is undefined behaviour (decided at the same
+  time).
+- `src/sema/typecheck.py` reports E004; the builder's existing E004 refusal
+  now cites the spec instead of calling itself a placeholder.
+- `tests/corpus/valid/arrays.mini` keeps its `= 0` and is **rejected with
+  E004 by design**: it is the semantically invalid example the C++ tests
+  (`SemaTests.cpp`, `DriverTests.cpp`) and `tests/test_typecheck.py` check.
+  (Dropping the `= 0` was tried and reverted the same day, because it broke
+  those two C++ tests.) Its directory still says `valid/` because that
+  bucket means *syntactically* valid (see "Evidence" above).
