@@ -10,6 +10,7 @@ print_float lines joined by newlines, with no trailing newline.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -63,11 +64,46 @@ def run_vm(module):
 # -- LLVM -------------------------------------------------------------------
 # lli is not on every machine, but any clang compiles textual IR.  printf
 # comes from libc; llvm.trap kills the process with SIGILL/SIGTRAP.
+#
+# Windows differs in three ways.  The executable needs a .exe suffix.  The
+# Microsoft C runtime defines printf inline in <stdio.h>, so IR that calls it
+# directly has to link legacy_stdio_definitions.lib.  And llvm.trap (ud2 on
+# x64, brk on ARM64) ends the process with an NTSTATUS exception code instead
+# of a signal.
+_WINDOWS = os.name == "nt"
+_WINDOWS_TRAPS = {0xC000001D,   # STATUS_ILLEGAL_INSTRUCTION
+                  0x80000003}   # STATUS_BREAKPOINT
+# clang on Windows reports a missing MSVC linker like this; that is a tool
+# that isn't installed, not IR the back end got wrong.
+_NO_LINKER = ("unable to find a Visual Studio installation",
+              "unable to execute command")
+
+
 def _clang():
-    for name in ("clang", "/opt/homebrew/opt/llvm/bin/clang"):
+    for name in ("clang", "/opt/homebrew/opt/llvm/bin/clang",
+                 r"C:\Program Files\LLVM\bin\clang.exe"):
         path = shutil.which(name)
         if path: return path
     return None
+
+
+def _exit_status(returncode: int, windows: bool = _WINDOWS):
+    """``(return value, trapped)`` from a native process's exit status.
+
+    On POSIX a trap is a signal (a negative returncode) and the status is 8
+    bits.  On Windows the status is main's full 32-bit return value, so only
+    the specific exception codes count as a trap.
+    """
+    if returncode < 0 or (windows and returncode in _WINDOWS_TRAPS):
+        return 0, True
+    code = returncode & 0xFF          # sign-extend so small negatives survive
+    return (code - 256 if code > 127 else code), False
+
+
+def _native_stdout(stdout: str) -> str:
+    """The Microsoft C runtime prints a NaN as `-nan(ind)` or `nan(snan)`;
+    reduce that to the `nan` / `-nan` every other target prints."""
+    return re.sub(r"nan\([a-z]*\)", "nan", stdout.rstrip("\n"))
 
 
 def run_llvm(module):
@@ -76,19 +112,21 @@ def run_llvm(module):
     if clang is None:
         raise Unavailable("clang is not installed")
     with tempfile.TemporaryDirectory() as tmp:
-        ll, exe = Path(tmp) / "m.ll", Path(tmp) / "m"
+        ll = Path(tmp) / "m.ll"
+        exe = Path(tmp) / ("m.exe" if _WINDOWS else "m")
         ll.write_text(emit(module))
-        build = subprocess.run([clang, "-O0", "-w", str(ll), "-o", str(exe)],
-                               capture_output=True, text=True)
+        cmd = [clang, "-O0", "-w", str(ll), "-o", str(exe)]
+        if _WINDOWS:
+            cmd.append("-llegacy_stdio_definitions")
+        build = subprocess.run(cmd, capture_output=True, text=True)
         if build.returncode != 0:
+            if _WINDOWS and any(s in build.stderr for s in _NO_LINKER):
+                raise Unavailable("clang found no MSVC linker (install the "
+                                  "Visual Studio C++ build tools)")
             raise RuntimeError(f"clang rejected the IR:\n{build.stderr}")
         proc = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
-    stdout = proc.stdout.rstrip("\n")
-    if proc.returncode < 0:                       # killed by a signal: a trap
-        return 0, stdout, True
-    # A process exit status is 8 bits; sign-extend so small negatives survive.
-    code = proc.returncode
-    return (code - 256 if code > 127 else code), stdout, False
+    value, trapped = _exit_status(proc.returncode)
+    return value, _native_stdout(proc.stdout), trapped
 
 
 TARGETS = {"interp": run_interp, "llvm": run_llvm, "wasm": run_wasm, "vm": run_vm}

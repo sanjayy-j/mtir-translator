@@ -11,6 +11,7 @@ import pytest
 
 from tests.harness.differential import _same, corpus_paths, run_all
 from tests.harness.gen_random import generate
+from tests.harness.runners import _exit_status, _native_stdout
 
 # Rejected with E004 by design (decision 0001); the C++ tests use it as
 # their semantically invalid example, so it stays as it is.
@@ -51,6 +52,25 @@ def test_nan_sign_is_not_compared(seed, opt):
     """Regression: these seeds print inf - inf.  On x86 that NaN is negative
     and the native binary prints "-nan"; the other targets print "nan"."""
     check(run_all(source=generate(seed), name=f"seed{seed}", opt=opt))
+
+
+@pytest.mark.parametrize("returncode,windows,expected", [
+    (0, False, (0, False)),
+    (255, False, (-1, False)),             # main returned -1
+    (-4, False, (0, True)),                # SIGILL from llvm.trap
+    (-5, False, (0, True)),                # SIGTRAP
+    (0xFFFFFFFF, True, (-1, False)),       # Windows keeps all 32 bits of -1
+    (0xFFFFFFFB, True, (-5, False)),       # ... so a negative return isn't a trap
+    (0xC000001D, True, (0, True)),         # ud2: STATUS_ILLEGAL_INSTRUCTION
+    (0x80000003, True, (0, True)),         # STATUS_BREAKPOINT
+])
+def test_native_exit_status(returncode, windows, expected):
+    # Runs on every OS, so the Windows rules are checked on the Mac and in CI.
+    assert _exit_status(returncode, windows) == expected
+
+
+def test_native_stdout_reduces_msvc_nan_spellings():
+    assert _native_stdout("1\n-nan(ind)\nnan(snan)\ninf\n") == "1\n-nan\nnan\ninf"
 
 
 def test_same_ignores_only_the_sign_of_nan():

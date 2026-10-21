@@ -105,6 +105,39 @@ jobs:
             exit 1
           fi
 
+  # The team demos on Windows, where the LLVM runner needs a .exe, links
+  # printf through legacy_stdio_definitions.lib and sees a trap as an
+  # NTSTATUS code instead of a signal.  The runner image ships clang and the
+  # MSVC linker, so this is a real four-way run on Windows.
+  windows:
+    name: Python on Windows (four-way)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dev dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Run the harness
+        shell: bash
+        run: |
+          set -o pipefail
+          clang --version
+          python -m tests.harness.differential --random 100 | tee differential.log
+          if grep -q '^skipped' differential.log; then
+            echo "::error::a target was skipped, so this run is not a four-way comparison"
+            exit 1
+          fi
+
   validate-examples:
     name: Validate hand-written target files
     runs-on: ubuntu-latest
