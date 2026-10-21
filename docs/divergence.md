@@ -48,7 +48,7 @@ only when the operands prove it cannot trap, and never folds `fdiv`, `fptosi`
 or an operand that is NaN, so no pass can delete a trap that rows 1, 2 and 6
 require. Each of those refusals has its own test.
 
-### In the Python implementation (branch `python-combined`)
+### In the Python implementation
 
 | Row | CIR interpreter (`src/cir/interp.py`, the oracle) | LLVM (`src/backend/llvm/`) | WebAssembly (`src/backend/wasm/emit_wat.py`) | Bytecode VM (`src/backend/stackvm/`) |
 |---|---|---|---|---|

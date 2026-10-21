@@ -139,9 +139,8 @@ are not touched here.
 
 ## 7. What is built
 
-On `python-combined` the implementation the team uses is **Python**; the
-C++17 port (from `origin/main`'s history) is kept in the tree but not
-developed here.
+The implementation the team uses is **Python**; the C++17 port is kept in
+the tree but not developed.
 
 | Piece | Python (the implementation) | C++ port |
 |---|---|---|

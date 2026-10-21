@@ -1,14 +1,14 @@
-# Status: python-combined
+# Status
 
-**As of 20 Oct 2026** · branch `python-combined` (pushed) · last commit `c80fac8`
+**As of 21 Oct 2026** · branch `main` · last commit `68cc730`
 
 ## At a glance
 
 | | |
 |---|---|
-| Test suite | **553 tests, all pass, 0 skipped** (`python -m pytest -q`, ~45 s) |
+| Test suite | **560 tests, all pass, 0 skipped** (`python -m pytest -q`, ~45 s) |
 | Four-way agreement (interp / LLVM / Wasm / VM) | **507/507** at `--opt 0` and `--opt 1` (corpus + 500 random programs; target ≥ 98%) |
-| CI on GitHub | **all 3 jobs green** (C++, Python, hand-written examples) |
+| CI on GitHub | **all 5 jobs green** (C++, Python, hand-written examples, 500-seed differential at O0 and O1) |
 | Planned work since Review 2 | **10/10 done** |
 | Waiting on the team | one spec question (decision 0001 confirmed and `python-combined` merged into `main`, 21 Oct) |
 
@@ -85,7 +85,7 @@
 - The bytecode VM reuses the interpreter's arithmetic, so it checks the
   lowering, not the arithmetic.
 
-## Commit history on this branch
+## Commit history of the Python work (made on `python-combined`)
 
 ```
 c80fac8 docs: describe python-combined as the Python implementation

@@ -73,10 +73,10 @@ their C++ migration phase.
 `include/mtir/support/` is shared and changes by agreement, because every
 subsystem depends on `Diagnostic` and none of them owns it.
 
-On `python-combined` the Python tree under `src/**/*.py` and
+The Python tree under `src/**/*.py` and
 `tests/test_*.py` is the implementation the team uses. Ownership follows the
 same split: M1 `src/frontend/`, `src/driver.py`; M2 `src/sema/`,
 `src/cir/verifier.py`, `src/cir/interp.py`; M3 the rest of `src/cir/`,
 `src/opt/`, `src/backend/llvm/`; M4 `src/backend/wasm/`,
 `src/backend/stackvm/`, `tests/harness/`. The C++ tree is kept but not
-developed on this branch.
+developed.

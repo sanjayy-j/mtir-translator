@@ -2,8 +2,8 @@
 
 A complete briefing for anyone, a new Claude session included, picking up this
 project cold. It is meant to be enough on its own; the files it points to are
-for detail, not for orientation. Current as of **20 Oct 2026**, branch
-`python-combined` at `c80fac8`.
+for detail, not for orientation. Current as of **21 Oct 2026**, branch
+`main` at `68cc730`.
 
 ## 1. What this is
 
@@ -40,23 +40,25 @@ Working rules from Krishita (keep to them):
 - **One task at a time.** Finish it, report, and wait for "go" before the next.
   Krishita finds long multi-task runs too slow.
 - Commit messages are module-prefixed: `[M1] …`, `[M2] sema: …`, `[M6b] wasm: …`.
-- Ask before deleting files. Never touch `main` or force-push.
+- Work on `main` (the only branch). Ask before deleting files. Never
+  force-push.
 - Ask Krishita before making a language-design decision; don't invent
   semantics.
 
 ## 3. Branches and history
 
-- **`python-combined`** (working branch, pushed to
-  `github.com/sanjayy-j/mtir-translator`; Krishita is a collaborator). The
-  Python implementation the team agreed to use. Based on `da14d31`;
-  `f83794c` restored the Review 2 modules; everything after was the
-  20 Oct 2026 fix-up (see `status.md`).
-- **`main`**: a C++17-only rewrite by Sanjay (15–16 Sept, ending `5de2ff2`
-  "retire the Python prototype"). Legitimate, not tampering. Merging
-  `python-combined` into `main` is a **team decision, not yet made**.
+- **`main`** is the only branch and the working branch
+  (`github.com/sanjayy-j/mtir-translator`). Sanjay handed the repo over to
+  Krishita on 21 Oct 2026; Krishita has push access but not admin.
+- History: `main` was first a C++17-only rewrite by Sanjay (15–16 Sept,
+  ending `5de2ff2` "retire the Python prototype"). The Python implementation
+  was developed on `python-combined` (based on `da14d31`; `f83794c` restored
+  the Review 2 modules; then the 20 Oct 2026 fix-up, see `status.md`) and
+  merged into `main` on 21 Oct 2026 (PR #1, then PR #4). `python-combined`
+  and the `fix/` branches were then deleted.
 - The **C++ tree** (`include/`, `tools/`, `src/**/*.cpp`, `tests/*.cpp`,
-  `CMakeLists.txt`, `cmake/`) is still on this branch, inherited from
-  `da14d31`. It is **not developed here**: don't edit or delete it unless
+  `CMakeLists.txt`, `cmake/`) is still on `main`, kept from Sanjay's port.
+  It is **not developed**: don't edit or delete it unless
   Krishita asks. CI still builds and tests it, and it passes. The one edit made
   to it, at Krishita's request, is the `firstKind()` fix in
   `tests/LexerTests.cpp` (§9).
@@ -85,16 +87,17 @@ python -m src.driver --emit=ll docs/examples/abs.cir
 python -m tests.harness.gen_random 42
 ```
 
-- `pytest`: **553 tests, all pass, none skipped**, about 45 s (the
+- `pytest`: **560 tests, all pass, none skipped**, about 45 s (the
   differential tests compile with clang).
 - Tools: `clang` (Apple, from Xcode) runs and verifies LLVM IR, since there's
   no `lli` or `llvm-as` locally; the `wasmtime` pip package assembles and runs
   WAT. Tests that need a missing tool **skip**, not fail.
 - C++ (only if touched): `cmake -S . -B <dir> && cmake --build <dir> &&
   ctest --test-dir <dir>`. Build outside the repo (e.g. the scratchpad).
-- CI (`.github/workflows/ci.yml`) has 3 jobs (C++ build+ctest, Python
-  pytest, validate `docs/examples/abs.ll`/`.wat`). **All green** as of
-  `5b1f572`. Check with `gh run list --branch python-combined`.
+- CI (`.github/workflows/ci.yml`) has 5 jobs (C++ build+ctest, Python
+  pytest, validate `docs/examples/abs.ll`/`.wat`, and the 500-seed
+  differential at `--opt 0` and `--opt 1`). **All green** as of `68cc730`.
+  Check with `gh run list --branch main`.
 
 `--run` prints the program's output followed by `main`'s return value.
 Expected:
@@ -227,7 +230,7 @@ before a trap; interpreter and constant folder didn't wrap constants; folded
 C++ CI fix: `tests/LexerTests.cpp` did `CHECK_EQ(kindsOf("42")[0], …)`, which
 read a destroyed temporary (`CHECK_EQ` binds `const auto &`), so it failed with
 garbage values. A by-value `firstKind()` helper fixes it. The lexer itself was
-fine. `main` has the same bug.
+fine. (`main` had the same bug; Sanjay's PR #2 fixed it there.)
 
 ## 10. If you are asked to do something next
 

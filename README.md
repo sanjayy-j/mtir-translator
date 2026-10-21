@@ -5,8 +5,7 @@
 Design a common intermediate representation and translate it to multiple
 execution targets while preserving semantics.
 
-This branch (`python-combined`) is the **Python** implementation the team
-agreed to use. It is complete end to end: MiniLang source → AST → checked AST
+The **Python** implementation is the one the team agreed to use. It is complete end to end: MiniLang source → AST → checked AST
 → **CIR** (typed, register-based three-address IR with an explicit CFG) →
 three targets, all checked against a reference interpreter.
 
@@ -107,16 +106,16 @@ docs/               language spec, CIR spec, divergence table,
 status.md           what was fixed and built since Review 2
 
 include/ src/**/*.cpp tools/ tests/*.cpp CMakeLists.txt
-                    the C++17 port from origin/main's history, kept but
-                    not developed on this branch (CI still builds it)
+                    the C++17 port (Sanjay's rewrite), kept but
+                    not developed (CI still builds it)
 ```
 
 ## Branches
 
-- `python-combined` (this one): the Python implementation, which the team
-  agreed to use.
-- `main`: a C++17-only rewrite (see `docs/migration.md` on that branch).
-  Merging `python-combined` into it is a team decision.
+`main` is the only branch. It holds the Python implementation, which the team
+agreed to use, and keeps the C++17 port alongside it (see
+`docs/migration.md`). The Python work was developed on `python-combined` and
+merged into `main` on 21 Oct 2026.
 
 ## Documentation
 
