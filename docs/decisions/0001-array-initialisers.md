@@ -1,8 +1,8 @@
 # Decision needed: what does `let xs: int[8] = 0;` mean?
 
 **Status:** DECIDED, 20 Oct 2026: **Option A** (forbid the initialiser).
-Decided by Krishita Gupta (M1, owner of `minilang-spec.md`); to be confirmed
-by the team.
+Decided by Krishita Gupta (M1, owner of `minilang-spec.md`); confirmed by
+the team (Sanjay J, M3) on 21 Oct 2026.
 **Raised by:** Member 3, during the C++ migration audit.
 **Affects:** M1 (grammar/spec), M2 (type checker), M3 (CIR builder), M4 (corpus).
 

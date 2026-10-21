@@ -10,7 +10,7 @@
 | Four-way agreement (interp / LLVM / Wasm / VM) | **507/507** at `--opt 0` and `--opt 1` (corpus + 500 random programs; target ≥ 98%) |
 | CI on GitHub | **all 3 jobs green** (C++, Python, hand-written examples) |
 | Planned work since Review 2 | **10/10 done** |
-| Waiting on the team | confirm decision 0001 · whether to merge into `main` · one spec question |
+| Waiting on the team | one spec question (decision 0001 confirmed and `python-combined` merged into `main`, 21 Oct) |
 
 ## What works
 
@@ -66,12 +66,13 @@
 
 ## Open items
 
-### Needs the team
-- **Confirm decision 0001** (array declarations take no initialiser; reading
-  anything unassigned is undefined). Decided by Krishita as M1, the spec owner.
-- **Merge `python-combined` into `main`?** `main` is Sanjay's C++ rewrite.
-- **Tell Sanjay** about the `LexerTests.cpp` fix (commit `5b1f572`) so `main`
-  can take it.
+### Settled on 21 Oct 2026
+- **Decision 0001 confirmed** by the team (Sanjay, M3): array declarations
+  take no initialiser; reading anything unassigned is undefined.
+- **`python-combined` merged into `main`** (PR #1, `7ab2f6b`). The C++ tree is
+  still there and CI on `main` is green. Sanjay handed the repo over to
+  Krishita.
+- The `LexerTests.cpp` fix reached `main` through PR #2.
 
 ### Spec question (M1)
 - An int literal that doesn't fit in `int`, e.g. `x / 4294967296` with

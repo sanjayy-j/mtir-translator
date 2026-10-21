@@ -175,17 +175,18 @@ Expected:
 
 ## 7. Decisions and open questions
 
-- **Decision 0001 (DECIDED 20 Oct 2026, option A, by Krishita as M1; team to
-  confirm):** an array declaration takes no initialiser:
+- **Decision 0001 (DECIDED 20 Oct 2026, option A, by Krishita as M1;
+  confirmed by the team, Sanjay, 21 Oct):** an array declaration takes no initialiser:
   `let xs: int[8] = 0;` is **E004** (spec §5). `tests/corpus/valid/arrays.mini`
   **keeps its `= 0` on purpose**: it is the rejected example the C++ tests
   (`SemaTests.cpp`, `DriverTests.cpp`) and `test_typecheck.py` check.
   Removing the `= 0` was tried and broke C++ CI; don't "fix" it.
 - **Open:** should an int literal that doesn't fit `int` (e.g. `4294967296` in
   an int context, which silently wraps to 0) be a compile error? Spec owner M1.
-- **Open (team):** confirm decision 0001; decide whether `python-combined`
-  becomes the main line; tell Sanjay that `main` has the same `LexerTests.cpp`
-  bug (§9).
+- **Settled 21 Oct 2026:** `python-combined` was merged into `main` (PR #1,
+  `7ab2f6b`), so the Python implementation is the main line; the C++ tree
+  stays and CI on `main` is green. `main` has the `LexerTests.cpp` fix (PR #2).
+  Sanjay handed the repo over to Krishita.
 
 ## 8. Gotchas for whoever edits next
 
