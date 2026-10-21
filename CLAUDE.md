@@ -25,6 +25,6 @@ Current state and open items: `status.md`.
 - `tests/corpus/valid/arrays.mini` keeps its `= 0` on purpose (the E004
   example). Don't "fix" it.
 - Python ≥ 3.10: use `./venv/bin/python` (macOS `python3` is 3.9).
-- Before saying work is done: `python -m pytest -q` (560 pass, 0 skipped),
+- Before saying work is done: `python -m pytest -q` (582 pass, 0 skipped),
   plus `python -m tests.harness.differential --random 500` at `--opt 0` and
   `--opt 1` for back-end or optimiser changes.

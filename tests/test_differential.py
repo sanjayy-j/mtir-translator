@@ -37,9 +37,11 @@ def test_random(seed, opt):
 
 @pytest.mark.parametrize("seed", [122, 475])
 def test_out_of_range_int_literal_wraps_everywhere(seed):
-    """Regression: these seeds use 4294967296 in an int context.  The
-    interpreter and the constant folder used the unwrapped value; every back
-    end wraps it to 0 (and so traps on dividing by it)."""
+    """Regression: these seeds use 4294967296 in all-literal expressions such
+    as `0 / (4294967296 | 1)`.  Those used to be computed in i32, where the
+    interpreter and the constant folder used the unwrapped value and every
+    back end wrapped it to 0.  Since literals are typed by value (spec
+    section 4) they are long arithmetic, which all targets must agree on."""
     check(run_all(source=generate(seed), name=f"seed{seed}", opt=1))
 
 

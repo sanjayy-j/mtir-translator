@@ -81,6 +81,20 @@ _INT_TYPES = (Ty.I1, Ty.I32, Ty.I64)
 _WIDEN = {(Ty.I32, Ty.I64): "sext", (Ty.I32, Ty.F64): "sitofp",
           (Ty.I1, Ty.I32): "zext", (Ty.I1, Ty.I64): "zext"}
 
+
+def _fits(value: int, ty: Ty) -> bool:
+    return wrap_int(value, ty) == value
+
+
+def _int_lit(value: int, node: object) -> ConstInt:
+    """An integer literal is an int if its value fits, otherwise a long
+    (docs/minilang-spec.md section 4)."""
+    for ty in (Ty.I32, Ty.I64):
+        if _fits(value, ty):
+            return ConstInt(value, ty)
+    raise BuildError("E005", f"integer literal {value} does not fit in long", node)
+
+
 _SIGNED_CMP = {"==": "eq", "!=": "ne", "<": "slt", "<=": "sle",
                ">": "sgt", ">=": "sge"}
 _FLOAT_CMP = {"==": "oeq", "!=": "one", "<": "olt", "<=": "ole",
@@ -442,7 +456,7 @@ class _FnBuilder:
     def expr(self, node: ast.Expr) -> Value:
         match node:
             case ast.IntLit():
-                return ConstInt(node.value, Ty.I32)
+                return _int_lit(node.value, node)
             case ast.FloatLit():
                 return ConstFloat(node.value)
             case ast.BoolLit():
@@ -493,12 +507,14 @@ class _FnBuilder:
                          node)
 
     def unary(self, node: ast.Unary) -> Value:
+        if node.op == "-" and isinstance(node.operand, ast.IntLit):
+            # A negative literal is typed by its negated value, so that
+            # -2147483648 is the single i32 constant INT_MIN even though
+            # 2147483648 on its own is a long.
+            return _int_lit(-node.operand.value, node)
         value = self.expr(node.operand)
         ty = self.type_of(value)
         if node.op == "-":
-            # Fold negation of a literal here, so that -2147483648 is the
-            # single constant INT_MIN rather than a subtraction from an
-            # unrepresentable positive 2147483648.
             if isinstance(value, ConstInt):
                 return ConstInt(wrap_int(-value.value, ty), ty)
             if isinstance(value, ConstFloat):
@@ -630,6 +646,10 @@ class _FnBuilder:
         if vty is ty:
             return value
         if isinstance(value, ConstInt) and ty in _INT_TYPES:
+            if ty is not Ty.I1 and not _fits(value.value, ty):
+                name = "int" if ty is Ty.I32 else "long"
+                raise BuildError("E005", f"integer literal {value.value} does "
+                                         f"not fit in {name}", node)
             return ConstInt(value.value, ty)      # literals adopt their context
         if isinstance(value, ConstInt) and ty is Ty.F64:
             return ConstFloat(float(value.value))

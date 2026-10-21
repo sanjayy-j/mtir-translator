@@ -87,7 +87,7 @@ python -m src.driver --emit=ll docs/examples/abs.cir
 python -m tests.harness.gen_random 42
 ```
 
-- `pytest`: **560 tests, all pass, none skipped**, about 45 s (the
+- `pytest`: **582 tests, all pass, none skipped**, about 45 s (the
   differential tests compile with clang).
 - Tools: `clang` (Apple, from Xcode) runs and verifies LLVM IR, since there's
   no `lli` or `llvm-as` locally; the `wasmtime` pip package assembles and runs
@@ -184,8 +184,12 @@ Expected:
   **keeps its `= 0` on purpose**: it is the rejected example the C++ tests
   (`SemaTests.cpp`, `DriverTests.cpp`) and `test_typecheck.py` check.
   Removing the `= 0` was tried and broke C++ CI; don't "fix" it.
-- **Open:** should an int literal that doesn't fit `int` (e.g. `4294967296` in
-  an int context, which silently wraps to 0) be a compile error? Spec owner M1.
+- **Decided 21 Oct 2026 (Krishita, M1): integer literals are typed by value.**
+  `int` if the value fits, otherwise `long`; `-2147483648` is an `int`; too
+  big for `long` is E005. So `let x: int = 4294967296;` is E005, and
+  `4294967296 + 1` is `long` arithmetic. Spec §4; implemented in both the
+  builder (`_int_lit`) and the type checker (`_lit_type`). The C++ port was
+  not changed.
 - **Settled 21 Oct 2026:** `python-combined` was merged into `main` (PR #1,
   `7ab2f6b`), so the Python implementation is the main line; the C++ tree
   stays and CI on `main` is green. `main` has the `LexerTests.cpp` fix (PR #2).
@@ -195,10 +199,12 @@ Expected:
 
 - Changing **`wrap_int`'s `i1` behaviour** breaks `tests/test_opt.py`
   (`(1, Ty.I1, -1)` is pinned). Normalise `i1` locally instead.
-- A literal is typed `int` by the builder until context widens it, so
-  `5 >> p` with `p: long` is **E005** (the shift count narrows), and an
-  all-literal expression is computed in i32. The generator avoids
-  `literal >> long`.
+- A literal that fits `int` is an `int` until context widens it, so
+  `5 >> p` with `p: long` is **E005** (the shift count narrows), and
+  `5 + 3` is computed in i32 even where a `long` is expected. A literal
+  that doesn't fit `int` is a `long` (spec §4). The generator avoids
+  `literal >> long`. Negative literals: `-<literal>` is typed by its
+  negated value in both the builder and the checker; keep them in step.
 - The **builder runs before the type checker**. Both report E-codes; the
   builder's win when both would fire.
 - `reg2stack.peephole` drops `local.set x; local.get x` pairs, so the stack VM

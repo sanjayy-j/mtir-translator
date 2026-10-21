@@ -78,6 +78,14 @@ and `else if` chains need no special rule.
 
 ## 4. Conversion rules
 
+An integer literal has type `int` if its value fits in `int`, and `long`
+otherwise (decided 21 Oct 2026). A minus sign directly in front of a literal
+is part of its value, so `-2147483648` is an `int` although `2147483648` is a
+`long`. A literal that doesn't fit in `long` is **E005**. So
+`let x: int = 4294967296;` is E005 (a `long` narrows to `int`), while
+`let y: long = 4294967296 + 1;` is `long` arithmetic. Hexadecimal literals
+follow the same rule: `0xFFFFFFFF` is the `long` 4294967295, not -1.
+
 No implicit narrowing. `int → long` and `int → float` are inserted
 automatically by the type checker as explicit conversion nodes; everything
 else must be written out. The parser never infers a type — `Expr.ty` is

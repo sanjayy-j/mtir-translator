@@ -6,7 +6,8 @@ Detects the twelve diagnostics of docs/minilang-spec.md section 7 and annotates
 every expression's ``ty`` with its type name.  Types are the strings 'int',
 'long', 'float', 'bool', 'void', and 'T[]' for an array of T.
 
-Conversions (spec section 4): int -> long and int -> float are implicit, in
+An integer literal is an int if its value fits, otherwise a long (spec
+section 4).  Conversions (spec section 4): int -> long and int -> float are implicit, in
 assignments, arguments, returns and binary operands.  Every other change of
 numeric type is a narrowing conversion (E005); a change between unrelated
 types is E004 in an assignment, E008 in an argument and E003 in an operator.
@@ -39,6 +40,13 @@ def _tyname(t):
 
 def _widens(actual, expected):
     return actual == expected or (actual, expected) in _WIDEN
+
+
+def _lit_type(v):
+    """Type of an integer literal with value ``v`` (spec section 4)."""
+    if -2**31 <= v < 2**31: return 'int'
+    if -2**63 <= v < 2**63: return 'long'
+    return None
 
 
 def _unify(a, b):
@@ -177,7 +185,7 @@ class _Checker:
         return e.ty
 
     def _expr(self, e):
-        if isinstance(e, A.IntLit): return 'int'
+        if isinstance(e, A.IntLit): return self.int_lit(e, e.value)
         if isinstance(e, A.FloatLit): return 'float'
         if isinstance(e, A.BoolLit): return 'bool'
         if isinstance(e, A.VarRef): return self.resolve(e).ty
@@ -187,6 +195,11 @@ class _Checker:
             if self.expr(e.index) != 'int': self.err('E012', "array index must be int", e.index)
             return base[:-2]
         if isinstance(e, A.Unary):
+            if e.op == '-' and isinstance(e.operand, A.IntLit):
+                # A negative literal is typed by its negated value, so
+                # -2147483648 is an int even though 2147483648 is a long.
+                e.operand.ty = self.int_lit(e, -e.operand.value)
+                return e.operand.ty
             t = self.expr(e.operand)
             ok = {'!': ('bool',), '-': NUMERIC, '~': INTEGRAL}[e.op]
             if t not in ok: self.err('E003', f"operator {e.op!r} is not defined on {t}", e)
@@ -194,6 +207,11 @@ class _Checker:
         if isinstance(e, A.Binary): return self.binary(e)
         if isinstance(e, A.Call): return self.call(e)
         self.err('E003', f"unsupported expression {type(e).__name__}", e)
+
+    def int_lit(self, e, v):
+        t = _lit_type(v)
+        if t is None: self.err('E005', f"integer literal {v} does not fit in long", e)
+        return t
 
     def binary(self, e):
         a, b, op = self.expr(e.lhs), self.expr(e.rhs), e.op

@@ -6,11 +6,11 @@
 
 | | |
 |---|---|
-| Test suite | **560 tests, all pass, 0 skipped** (`python -m pytest -q`, ~45 s) |
+| Test suite | **582 tests, all pass, 0 skipped** (`python -m pytest -q`, ~45 s) |
 | Four-way agreement (interp / LLVM / Wasm / VM) | **507/507** at `--opt 0` and `--opt 1` (corpus + 500 random programs; target ≥ 98%) |
 | CI on GitHub | **all 5 jobs green** (C++, Python, hand-written examples, 500-seed differential at O0 and O1) |
 | Planned work since Review 2 | **10/10 done** |
-| Waiting on the team | one spec question (decision 0001 confirmed and `python-combined` merged into `main`, 21 Oct) |
+| Waiting on the team | nothing (decision 0001 confirmed, `python-combined` merged into `main`, literal typing decided, 21 Oct) |
 
 ## What works
 
@@ -74,10 +74,13 @@
   Krishita.
 - The `LexerTests.cpp` fix reached `main` through PR #2.
 
-### Spec question (M1)
-- An int literal that doesn't fit in `int`, e.g. `x / 4294967296` with
-  `x: int`, is accepted and silently becomes 0 (now consistently on every
-  target). Should it be a compile error?
+### Spec question (M1), decided 21 Oct 2026
+- An integer literal is typed by its value: `int` if it fits, otherwise
+  `long` (spec section 4). `let x: int = 4294967296;` and `x / 4294967296`
+  with `x: int` are now E005 instead of silently becoming 0, and all-literal
+  `long` expressions such as `4294967296 + 1` or `-9000000000` are no longer
+  computed in i32. Done in the type checker and the builder; the C++ port
+  still has the old behaviour.
 
 ### Known limitations (not bugs)
 - Global arrays are not lowered (only scalar globals).

@@ -33,6 +33,16 @@ SOURCES = {
             let n: long = -a; if (n < 0) { print_int(-1); }
             return 0;
         }""",
+    "literals_typed_by_value": """
+        fn main() -> int {
+            let a: long = 4294967296 + 1; let b: long = -9000000000;
+            let c: long = 0 / (4294967296 | 1);
+            if (a == 4294967297) { print_int(1); }
+            if (b < -8999999999) { print_int(2); }
+            if (c == 0) { print_int(3); }
+            let m: int = -2147483648; print_int(m);
+            return 0;
+        }""",
     "globals_and_bools": """
         global g: int = 5;
         global flag: bool = true;

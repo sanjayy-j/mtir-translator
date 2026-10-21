@@ -22,6 +22,14 @@ def chk(body, extra=""):
     ("E004", "let xs: int[8] = 0;", ""),        # decision 0001, option A
     ("E005", "let l: long = 1; let x: int = l;", ""),
     ("E005", "let f: float = 1.0; let x: int = f;", ""),
+    ("E005", "let x: int = 4294967296;", ""),               # a literal that
+    ("E005", "let x: int = 2147483648;", ""),               # doesn't fit int
+    ("E005", "let x: int = -2147483649;", ""),              # is a long
+    ("E005", "let x: int = 0xFFFFFFFF;", ""),
+    ("E005", "let x: int = 1; let y: int = x / 4294967296;", ""),
+    ("E005", "let f: float = 4294967296;", ""),             # long -> float
+    ("E005", "let l: long = 9223372036854775808;", ""),     # fits nothing
+    ("E005", "", "global g: int = 4294967296;"),
     ("E006", "nope();", ""),
     ("E007", "f(1, 2);", "fn f(a: int) {}"),
     ("E008", "f(true);", "fn f(a: int) {}"),
@@ -45,6 +53,9 @@ def test_diagnostics(code, body, extra):
     "let l: long = 1; let s: long = l << 3;",             # shift count widens
     "let x: int = 1; { let x: float = 2.0; }",            # shadowing is legal
     "let b: bool = true & false;",
+    "let x: int = 2147483647; let y: int = -2147483648;",   # int's own range
+    "let l: long = 4294967296 + 1; let m: long = -9000000000;",
+    "let l: long = 9223372036854775807; let m: long = -9223372036854775808;",
     "for (let i: int = 0; i < 2; i = i + 1) { if (i == 1) { continue; } }",
 ])
 def test_accepted(body):

@@ -155,6 +155,24 @@ def test_negating_a_literal_folds_rather_than_emitting_a_subtraction(mini_module
     assert fn.blocks[0].instrs[0].args[0] == ConstInt(-2147483648, Ty.I32)
 
 
+@pytest.mark.parametrize("ret,expr,const", [
+    ("int", "2147483647", ConstInt(2147483647, Ty.I32)),
+    ("long", "2147483648", ConstInt(2147483648, Ty.I64)),
+    ("long", "-2147483649", ConstInt(-2147483649, Ty.I64)),
+    ("long", "-9000000000", ConstInt(-9000000000, Ty.I64)),
+])
+def test_an_integer_literal_is_typed_by_its_value(mini_module, ret, expr, const):
+    """Spec section 4: int if the value fits, otherwise long.  -9000000000
+    used to be wrapped to i32 before it was widened."""
+    fn = mini_module(f"fn f() -> {ret} {{ return {expr}; }}").function("f")
+    assert fn.blocks[0].instrs[0].args[0] == const
+
+
+def test_a_long_literal_makes_its_operation_long(mini_module):
+    fn = mini_module("fn f() -> long { return 4294967296 + 1; }").function("f")
+    assert fn.blocks[0].instrs[0].ty is Ty.I64
+
+
 def test_integer_negation_is_a_subtraction_from_zero(mini_module):
     fn = mini_module("fn f(x: int) -> int { return -x; }").function("f")
     assert ops(fn) == ["sub", "ret"]
@@ -235,6 +253,10 @@ def test_recursion_needs_no_forward_declaration(mini_module):
     ("fn f(n: int) -> void { if (n) { } }", "E003"),
     ("fn f() -> void { let xs: int[4] = 0; }", "E004"),
     ("global t: int[4];\nfn f() -> void { }", "E003"),
+    ("fn f() -> void { let x: int = 4294967296; }", "E005"),
+    ("fn f() -> void { let x: int = -2147483649; }", "E005"),
+    ("fn f() -> void { print_int(2147483648); }", "E005"),
+    ("fn f() -> void { let x: long = 9223372036854775808; }", "E005"),
 ])
 def test_untypeable_input_is_refused_with_the_right_code(source, code):
     with pytest.raises(BuildError) as excinfo:
